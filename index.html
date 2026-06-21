@@ -74,6 +74,20 @@
 
     #reset-btn:hover { background: #c5d8fb; }
 
+    /* ── 非工作日警告 ── */
+    #nonwork-warn {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      background: #fff3cd;
+      color: #856404;
+      border: 1px solid #ffc107;
+      border-radius: 8px;
+      padding: 6px 14px;
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
     /* ── 卡片 ── */
     .cards {
       display: flex;
@@ -136,18 +150,10 @@
   <label for="date-input">辦理日期：</label>
   <input type="date" id="date-input">
   <button id="reset-btn">回到今天</button>
+  <span id="nonwork-warn">⚠️ 非工作日，已自動調整至下一個工作日</span>
 </div>
 
 <div class="cards">
-  <div class="card blue">
-    <div class="card-title">僑居加簽</div>
-    <div class="card-days">4 個工作天</div>
-    <div class="card-date"    id="d1-date"></div>
-    <div class="card-weekday" id="d1-weekday"></div>
-    <div class="card-full"    id="d1-full"></div>
-    <div class="days-remaining" id="d1-remain"></div>
-  </div>
-
   <div class="card green">
     <div class="card-title">僑民身分證明書</div>
     <div class="card-days">3 個工作天</div>
@@ -155,6 +161,15 @@
     <div class="card-weekday" id="d2-weekday"></div>
     <div class="card-full"    id="d2-full"></div>
     <div class="days-remaining" id="d2-remain"></div>
+  </div>
+
+  <div class="card blue">
+    <div class="card-title">僑居加簽</div>
+    <div class="card-days">4 個工作天</div>
+    <div class="card-date"    id="d1-date"></div>
+    <div class="card-weekday" id="d1-weekday"></div>
+    <div class="card-full"    id="d1-full"></div>
+    <div class="days-remaining" id="d1-remain"></div>
   </div>
 </div>
 
@@ -236,6 +251,15 @@
       diff === 0 ? '今天可取件' : `距今 ${diff} 天後可取件`;
   }
 
+  // 找到當日或之後最近的工作日
+  function nearestWorkingDay(dateStr) {
+    const d = parseDate(dateStr);
+    while (isNonWorkingDay(d)) {
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
+    return toKey(d);
+  }
+
   function calculate(dateStr) {
     const base = parseDate(dateStr);
     formatCard('d1', addWorkingDays(base, 4), base);
@@ -244,19 +268,24 @@
 
   const input    = document.getElementById('date-input');
   const resetBtn = document.getElementById('reset-btn');
+  const warn     = document.getElementById('nonwork-warn');
 
-  const today = getTaiwanToday();
-  input.value = today;
-  calculate(today);
+  function setDate(dateStr) {
+    const adjusted = nearestWorkingDay(dateStr);
+    const wasAdjusted = adjusted !== dateStr;
+    input.value = adjusted;
+    warn.style.display = wasAdjusted ? 'flex' : 'none';
+    calculate(adjusted);
+  }
+
+  setDate(getTaiwanToday());
 
   input.addEventListener('change', () => {
-    if (input.value) calculate(input.value);
+    if (input.value) setDate(input.value);
   });
 
   resetBtn.addEventListener('click', () => {
-    const t = getTaiwanToday();
-    input.value = t;
-    calculate(t);
+    setDate(getTaiwanToday());
   });
 </script>
 </body>
