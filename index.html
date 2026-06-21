@@ -149,6 +149,7 @@
 <div class="date-picker-wrap">
   <label for="date-input">辦理日期：</label>
   <input type="date" id="date-input">
+  <span id="input-weekday" style="font-size:1rem;color:#444;font-weight:bold;min-width:4em;"></span>
   <button id="reset-btn">回到今天</button>
   <span id="nonwork-warn">⚠️ 非工作日，已自動調整至下一個工作日</span>
 </div>
@@ -159,7 +160,6 @@
     <div class="card-days">3 個工作天</div>
     <div class="card-date"    id="d2-date"></div>
     <div class="card-weekday" id="d2-weekday"></div>
-    <div class="card-full"    id="d2-full"></div>
     <div class="days-remaining" id="d2-remain"></div>
   </div>
 
@@ -168,7 +168,6 @@
     <div class="card-days">4 個工作天</div>
     <div class="card-date"    id="d1-date"></div>
     <div class="card-weekday" id="d1-weekday"></div>
-    <div class="card-full"    id="d1-full"></div>
     <div class="days-remaining" id="d1-remain"></div>
   </div>
 </div>
@@ -238,15 +237,13 @@
   }
 
   function formatCard(prefix, pickupDate, baseDate) {
-    const m   = pickupDate.getUTCMonth() + 1;
-    const d   = pickupDate.getUTCDate();
-    const y   = pickupDate.getUTCFullYear();
-    const dow = WEEKDAYS[pickupDate.getUTCDay()];
+    const m    = pickupDate.getUTCMonth() + 1;
+    const d    = pickupDate.getUTCDate();
+    const dow  = WEEKDAYS[pickupDate.getUTCDay()];
     const diff = daysBetween(baseDate, pickupDate);
 
     document.getElementById(prefix + '-date').textContent    = `${m}月${d}日`;
     document.getElementById(prefix + '-weekday').textContent = `星期${dow}`;
-    document.getElementById(prefix + '-full').textContent    = `${y} 年 ${m} 月 ${d} 日`;
     document.getElementById(prefix + '-remain').textContent  =
       diff === 0 ? '今天可取件' : `距今 ${diff} 天後可取件`;
   }
@@ -275,6 +272,9 @@
     const wasAdjusted = adjusted !== dateStr;
     input.value = adjusted;
     warn.style.display = wasAdjusted ? 'flex' : 'none';
+    // 顯示辦理日期星期
+    const d = parseDate(adjusted);
+    document.getElementById('input-weekday').textContent = `（星期${WEEKDAYS[d.getUTCDay()]}）`;
     calculate(adjusted);
   }
 
