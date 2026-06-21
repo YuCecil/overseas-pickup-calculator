@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>僑委會取件日計算</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: #f0f4f8;
+      font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px;
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      color: #555;
+      margin-bottom: 20px;
+      letter-spacing: 2px;
+    }
+
+    /* ── 日期選擇器區塊 ── */
+    .date-picker-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px 22px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 36px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .date-picker-wrap label {
+      font-size: 1rem;
+      color: #555;
+      white-space: nowrap;
+    }
+
+    #date-input {
+      font-size: 1rem;
+      font-family: inherit;
+      border: 2px solid #d0d8e4;
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: #333;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #date-input:focus { border-color: #1e88e5; }
+
+    #reset-btn {
+      font-size: 0.88rem;
+      font-family: inherit;
+      background: #e8f0fe;
+      color: #1565c0;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 14px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+
+    #reset-btn:hover { background: #c5d8fb; }
+
+    /* ── 卡片 ── */
+    .cards {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 1000px;
+    }
+
+    .card {
+      flex: 1;
+      min-width: 300px;
+      max-width: 460px;
+      border-radius: 20px;
+      padding: 40px 36px 44px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+    }
+
+    .card.blue  { background: linear-gradient(145deg, #1565c0, #1e88e5); color: #fff; }
+    .card.green { background: linear-gradient(145deg, #2e7d32, #43a047); color: #fff; }
+
+    .card-title   { font-size: 1.7rem; font-weight: bold; letter-spacing: 3px; margin-bottom: 10px; opacity: .95; }
+    .card-days    { font-size: 1rem; opacity: .8; margin-bottom: 28px; letter-spacing: 1px; }
+    .card-date    { font-size: 4.2rem; font-weight: 900; line-height: 1; margin-bottom: 10px; letter-spacing: -1px; }
+    .card-weekday { font-size: 1.8rem; font-weight: 600; opacity: .9; margin-bottom: 6px; }
+    .card-full    { font-size: 1.1rem; opacity: .75; margin-top: 4px; }
+
+    .days-remaining {
+      margin-top: 20px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 30px;
+      padding: 8px 22px;
+      font-size: 1rem;
+      letter-spacing: 1px;
+    }
+
+    .note {
+      margin-top: 28px;
+      background: #fff;
+      border-radius: 12px;
+      padding: 14px 22px;
+      font-size: 0.88rem;
+      color: #777;
+      max-width: 740px;
+      text-align: center;
+      line-height: 1.8;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+  </style>
+</head>
+<body>
+
+<h1>僑委會取件日期計算</h1>
+
+<div class="date-picker-wrap">
+  <label for="date-input">辦理日期：</label>
+  <input type="date" id="date-input">
+  <button id="reset-btn">回到今天</button>
+</div>
+
+<div class="cards">
+  <div class="card blue">
+    <div class="card-title">僑居加簽</div>
+    <div class="card-days">4 個工作天</div>
+    <div class="card-date"    id="d1-date"></div>
+    <div class="card-weekday" id="d1-weekday"></div>
+    <div class="card-full"    id="d1-full"></div>
+    <div class="days-remaining" id="d1-remain"></div>
+  </div>
+
+  <div class="card green">
+    <div class="card-title">僑民身分證明書</div>
+    <div class="card-days">3 個工作天</div>
+    <div class="card-date"    id="d2-date"></div>
+    <div class="card-weekday" id="d2-weekday"></div>
+    <div class="card-full"    id="d2-full"></div>
+    <div class="days-remaining" id="d2-remain"></div>
+  </div>
+</div>
+
+<div class="note">
+  ※ 依據中華民國 115 年政府行政機關辦公日曆表計算，假日不計入工作天。<br>
+  ※ 日期以台灣時間（UTC+8）為準。以上為預估取件日，實際以辦理單位告知為準。
+</div>
+
+<script>
+  // ── 115 年（2026）政府行政機關非工作日（週末以外）──
+  const EXTRA_HOLIDAYS = new Set([
+    '2026-01-01',                                                         // 元旦
+    '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',    // 春節
+    '2026-02-27',                                                         // 和平紀念日補假
+    '2026-04-03',                                                         // 兒童節+清明補假
+    '2026-05-01',                                                         // 勞動節
+    '2026-06-19',                                                         // 端午節
+    '2026-09-25',                                                         // 中秋節
+    '2026-09-28',                                                         // 孔子誕辰/教師節
+    '2026-10-09',                                                         // 國慶日補假
+    '2026-10-26',                                                         // 臺灣光復節補假
+    '2026-12-25',                                                         // 行憲紀念日
+  ]);
+
+  const WEEKDAYS = ['日','一','二','三','四','五','六'];
+
+  // 取得台灣今日（UTC+8）的 yyyy-mm-dd 字串
+  function getTaiwanToday() {
+    const now = new Date();
+    // 轉換成台灣時間
+    const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
+    return tw.toISOString().slice(0, 10);
+  }
+
+  // 從 yyyy-mm-dd 建立 UTC 午夜 Date（避免時區偏移）
+  function parseDate(str) {
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  }
+
+  function toKey(date) {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function isNonWorkingDay(date) {
+    const dow = date.getUTCDay(); // 0=Sun, 6=Sat
+    if (dow === 0 || dow === 6) return true;
+    return EXTRA_HOLIDAYS.has(toKey(date));
+  }
+
+  function addWorkingDays(base, n) {
+    const d = new Date(base);
+    let count = 0;
+    while (count < n) {
+      d.setUTCDate(d.getUTCDate() + 1);
+      if (!isNonWorkingDay(d)) count++;
+    }
+    return d;
+  }
+
+  function daysBetween(a, b) {
+    return Math.round((b - a) / 86400000);
+  }
+
+  function formatCard(prefix, pickupDate, baseDate) {
+    const m   = pickupDate.getUTCMonth() + 1;
+    const d   = pickupDate.getUTCDate();
+    const y   = pickupDate.getUTCFullYear();
+    const dow = WEEKDAYS[pickupDate.getUTCDay()];
+    const diff = daysBetween(baseDate, pickupDate);
+
+    document.getElementById(prefix + '-date').textContent    = `${m}月${d}日`;
+    document.getElementById(prefix + '-weekday').textContent = `星期${dow}`;
+    document.getElementById(prefix + '-full').textContent    = `${y} 年 ${m} 月 ${d} 日`;
+    document.getElementById(prefix + '-remain').textContent  =
+      diff === 0 ? '今天可取件' : `距今 ${diff} 天後可取件`;
+  }
+
+  function calculate(dateStr) {
+    const base = parseDate(dateStr);
+    formatCard('d1', addWorkingDays(base, 4), base);
+    formatCard('d2', addWorkingDays(base, 3), base);
+  }
+
+  const input    = document.getElementById('date-input');
+  const resetBtn = document.getElementById('reset-btn');
+
+  const today = getTaiwanToday();
+  input.value = today;
+  calculate(today);
+
+  input.addEventListener('change', () => {
+    if (input.value) calculate(input.value);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    const t = getTaiwanToday();
+    input.value = t;
+    calculate(t);
+  });
+</script>
+</body>
+</html>
