@@ -187,10 +187,19 @@
       margin-left: 16px;
     }
     .contact-ext {
-      font-size: 0.76rem;
+      font-size: 0.72rem;
       color: #aaa;
-      margin-left: 6px;
+      text-align: right;
+      margin-top: 1px;
     }
+
+    .phone-stack {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      margin-left: 16px;
+    }
+    .phone-stack .contact-phone { margin-left: 0; }
 
     /* 役齡條 */
     .mil-strip {
@@ -252,7 +261,7 @@
 <!-- 附屬資訊列 -->
 <div class="info-bar">
   <div class="info-box">
-    <div class="info-box-label">高雄市苓雅區政南街 6 號</div>
+    <div class="info-box-label">行政院南部聯合服務中心</div>
     <div class="contact-row">
       <span class="contact-label"><em>三樓</em>外交部</span>
       <a href="tel:0777156600" class="contact-phone">07-715-6600</a>
@@ -263,8 +272,8 @@
     </div>
     <div class="contact-row">
       <span class="contact-label"><em>九樓</em>僑委會</span>
-      <span style="display:flex;align-items:center;gap:6px;">
-        <a href="tel:0777150300" class="contact-phone" style="margin-left:0;">07-715-0300</a>
+      <span class="phone-stack">
+        <a href="tel:0777150300" class="contact-phone">07-715-0300</a>
         <span class="contact-ext">分機 219 或 281</span>
       </span>
     </div>
