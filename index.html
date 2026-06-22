@@ -203,20 +203,30 @@
       padding-bottom: 2px;
     }
 
-    /* 役齡參考 */
-    .mil-rows {
+    /* 役齡條 */
+    .mil-strip {
+      width: 100%;
+      max-width: 1000px;
+      margin-top: 12px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 12px 26px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
       display: flex;
-      gap: 20px;
+      align-items: center;
+      gap: 16px;
     }
-
-    .mil-item { flex: 1; }
-
-    .mil-item-years {
-      font-size: 2rem;
+    .mil-strip-label {
+      font-size: 0.72rem;
+      color: #bbb;
+      letter-spacing: 2px;
+      white-space: nowrap;
+    }
+    .mil-strip-years {
+      font-size: 1.4rem;
       font-weight: 900;
       color: #333;
       letter-spacing: 0.5px;
-      margin-top: 6px;
     }
   </style>
 </head>
@@ -273,34 +283,35 @@
         <td class="ct-title"></td>
         <td class="ct-phone"><a href="tel:0777150300">07-715-0300</a><span class="ct-ext">分機 219 或 281</span></td>
       </tr>
-      <tr class="ct-section">
-        <td colspan="4" class="ct-section-label">台北僑委會證照科</td>
-      </tr>
+    </table>
+  </div>
+
+  <div class="info-box">
+    <div class="info-box-label">台北僑委會證照科</div>
+    <table class="contact-table">
       <tr>
-        <td class="ct-floor"></td>
         <td class="ct-name">證照服務</td>
         <td class="ct-title"></td>
         <td class="ct-phone"><a href="tel:0223272620">02-2327-2620</a></td>
       </tr>
       <tr>
-        <td class="ct-floor"></td>
         <td class="ct-name">劉淑純</td>
         <td class="ct-title">科員</td>
         <td class="ct-phone"><a href="tel:0223272927">02-2327-2927</a></td>
       </tr>
       <tr>
-        <td class="ct-floor"></td>
         <td class="ct-name">鄭翔徽</td>
         <td class="ct-title">科長</td>
         <td class="ct-phone"><a href="tel:0223272928">02-2327-2928</a></td>
       </tr>
     </table>
   </div>
+</div>
 
-  <div class="info-box">
-    <div class="info-box-label">役齡男子（依今年自動計算）</div>
-    <div class="mil-item-years" id="mil-active"></div>
-  </div>
+<!-- 役齡條 -->
+<div class="mil-strip">
+  <span class="mil-strip-label">役齡男子</span>
+  <span class="mil-strip-years" id="mil-active"></span>
 </div>
 
 <script>
