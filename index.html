@@ -149,26 +149,29 @@
 
     /* 聯絡資訊 */
     .agency-row {
-      display: grid;
-      grid-template-columns: 3.2em 3.5em 1fr;
+      display: flex;
       align-items: baseline;
-      column-gap: 6px;
       padding: 5px 0;
       border-bottom: 1px solid #f0f0f0;
       width: 100%;
     }
     .agency-row:last-child { border-bottom: none; }
 
-    .agency-floor {
-      font-size: 0.78rem;
-      color: #bbb;
-      white-space: nowrap;
-    }
-
-    .agency-name {
+    .agency-label {
+      flex: 1;
       font-size: 0.92rem;
       color: #555;
-      font-weight: bold;
+    }
+    .agency-label em {
+      font-style: normal;
+      font-size: 0.78rem;
+      color: #bbb;
+      margin-right: 4px;
+    }
+    .agency-label small {
+      font-size: 0.78rem;
+      color: #bbb;
+      margin-left: 4px;
     }
 
     .agency-phone {
@@ -184,8 +187,7 @@
       font-size: 0.8rem;
       color: #999;
       white-space: nowrap;
-      grid-column: 3;
-      padding-left: 4px;
+      margin-left: 6px;
     }
 
     /* 役齡參考 */
@@ -240,34 +242,29 @@
   <div class="info-box">
     <div class="info-box-label">高雄市苓雅區政南街 6 號</div>
     <div class="agency-row">
-      <span class="agency-floor">三樓</span>
-      <span class="agency-name">外交部</span>
+      <span class="agency-label"><em>三樓</em>外交部</span>
       <a href="tel:0777156600" class="agency-phone">07-715-6600</a>
     </div>
     <div class="agency-row">
-      <span class="agency-floor">五樓</span>
-      <span class="agency-name">移民署</span>
+      <span class="agency-label"><em>五樓</em>移民署</span>
       <a href="tel:0777151660" class="agency-phone">07-715-1660</a>
     </div>
-    <div class="agency-row" style="grid-template-columns: 3.2em 3.5em auto 1fr;">
-      <span class="agency-floor">九樓</span>
-      <span class="agency-name">僑委會</span>
+    <div class="agency-row">
+      <span class="agency-label"><em>九樓</em>僑委會</span>
       <a href="tel:0777150300" class="agency-phone">07-715-0300</a>
-      <span class="agency-ext" style="padding-left:6px;">分機 219 或 281</span>
+      <span class="agency-ext">分機 219 或 281</span>
     </div>
     <div class="info-box-label" style="margin-top:12px;">台北僑委會證照科</div>
     <div class="agency-row">
-      <span class="agency-name" style="grid-column: 1 / 3;">證照服務</span>
+      <span class="agency-label">證照服務</span>
       <a href="tel:0223272620" class="agency-phone">02-2327-2620</a>
     </div>
     <div class="agency-row">
-      <span class="agency-name">劉淑純</span>
-      <span class="agency-floor">科員</span>
+      <span class="agency-label">劉淑純<small>科員</small></span>
       <a href="tel:0223272927" class="agency-phone">02-2327-2927</a>
     </div>
     <div class="agency-row">
-      <span class="agency-name">鄭翔徽</span>
-      <span class="agency-floor">科長</span>
+      <span class="agency-label">鄭翔徽<small>科長</small></span>
       <a href="tel:0223272928" class="agency-phone">02-2327-2928</a>
     </div>
   </div>
