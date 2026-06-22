@@ -128,17 +128,81 @@
       letter-spacing: 1px;
     }
 
-    .note {
-      margin-top: 28px;
+    /* ── 役齡區塊 ── */
+    .military-section {
+      margin-top: 36px;
+      width: 100%;
+      max-width: 1000px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .military-section h2 {
+      font-size: 1.1rem;
+      color: #666;
+      letter-spacing: 2px;
+      font-weight: normal;
+    }
+
+    .military-cards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .mil-card {
+      flex: 1;
+      min-width: 260px;
+      max-width: 460px;
       background: #fff;
-      border-radius: 12px;
-      padding: 14px 22px;
-      font-size: 0.88rem;
-      color: #777;
-      max-width: 740px;
+      border-radius: 16px;
+      padding: 20px 28px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
       text-align: center;
-      line-height: 1.8;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .mil-card-label {
+      font-size: 1rem;
+      color: #888;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+
+    .mil-card-age {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+
+    .mil-card-years {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #333;
+      letter-spacing: 1px;
+    }
+
+    .mil-warning {
+      width: 100%;
+      background: #d32f2f;
+      color: #fff;
+      border-radius: 14px;
+      padding: 18px 28px;
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      line-height: 1.7;
+      box-shadow: 0 4px 16px rgba(211,47,47,0.3);
+    }
+
+    .mil-warning .highlight {
+      font-size: 1.6rem;
+      display: block;
+      margin-top: 4px;
     }
   </style>
 </head>
@@ -178,6 +242,26 @@
   </div>
 </div>
 
+<!-- 役齡查詢 -->
+<div class="military-section">
+  <h2>役齡參考（依今年自動計算）</h2>
+  <div class="military-cards">
+    <div class="mil-card">
+      <div class="mil-card-label">接近役齡男子</div>
+      <div class="mil-card-age">16 ~ 18 歲</div>
+      <div class="mil-card-years" id="mil-near"></div>
+    </div>
+    <div class="mil-card">
+      <div class="mil-card-label">役齡男子</div>
+      <div class="mil-card-age">19 ~ 36 歲</div>
+      <div class="mil-card-years" id="mil-active"></div>
+    </div>
+  </div>
+  <div class="mil-warning">
+    役政用華僑身分證明書
+    <span class="highlight" id="mil-cutoff-text"></span>
+  </div>
+</div>
 
 <script>
   // ── 115 年（2026）政府行政機關非工作日（週末以外）──
@@ -289,6 +373,21 @@
   resetBtn.addEventListener('click', () => {
     setDate(getTaiwanToday());
   });
+
+  // ── 役齡計算 ──
+  (function() {
+    const y = parseInt(getTaiwanToday().slice(0, 4));
+    // 接近役齡：出生年 = y-18 ~ y-16
+    document.getElementById('mil-near').textContent =
+      `${y - 18} 年 ～ ${y - 16} 年出生`;
+    // 役齡：出生年 = y-36 ~ y-19
+    document.getElementById('mil-active').textContent =
+      `${y - 36} 年 ～ ${y - 19} 年出生`;
+    // 警告：役齡起始年（y-19）含以前才需辦
+    const cutoff = y - 19;
+    document.getElementById('mil-cutoff-text').textContent =
+      `${cutoff} 年（含）以前出生的男性才需要辦理`;
+  })();
 </script>
 </body>
 </html>
