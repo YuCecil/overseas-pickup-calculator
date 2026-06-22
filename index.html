@@ -148,46 +148,51 @@
     }
 
     /* 聯絡資訊 */
-    .agency-row {
-      display: flex;
-      align-items: baseline;
-      padding: 5px 0;
-      border-bottom: 1px solid #f0f0f0;
+    .contact-table {
       width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
     }
-    .agency-row:last-child { border-bottom: none; }
+    .contact-table tr { border-bottom: 1px solid #f0f0f0; }
+    .contact-table tr:last-child { border-bottom: none; }
+    .contact-table td { padding: 5px 0; vertical-align: middle; }
 
-    .agency-label {
-      flex: 1;
-      font-size: 0.92rem;
+    .ct-floor {
+      color: #bbb;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      padding-right: 4px;
+      width: 2.4em;
+    }
+    .ct-name {
       color: #555;
+      font-weight: bold;
+      white-space: nowrap;
+      padding-right: 6px;
+      width: 3.5em;
     }
-    .agency-label em {
-      font-style: normal;
-      font-size: 0.78rem;
+    .ct-title {
       color: #bbb;
-      margin-right: 4px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      padding-right: 6px;
+      width: 2em;
     }
-    .agency-label small {
-      font-size: 0.78rem;
-      color: #bbb;
-      margin-left: 4px;
+    .ct-phone {
+      white-space: nowrap;
     }
-
-    .agency-phone {
-      font-size: 1.05rem;
+    .ct-phone a {
+      font-size: 1.02rem;
       font-weight: bold;
       color: #1565c0;
       text-decoration: none;
       letter-spacing: 0.5px;
-      white-space: nowrap;
     }
-
-    .agency-ext {
-      font-size: 0.8rem;
+    .ct-ext {
+      font-size: 0.78rem;
       color: #999;
       white-space: nowrap;
-      margin-left: 6px;
+      padding-left: 4px;
     }
 
     /* 役齡參考 */
@@ -241,32 +246,47 @@
 <div class="info-bar">
   <div class="info-box">
     <div class="info-box-label">高雄市苓雅區政南街 6 號</div>
-    <div class="agency-row">
-      <span class="agency-label"><em>三樓</em>外交部</span>
-      <a href="tel:0777156600" class="agency-phone">07-715-6600</a>
-    </div>
-    <div class="agency-row">
-      <span class="agency-label"><em>五樓</em>移民署</span>
-      <a href="tel:0777151660" class="agency-phone">07-715-1660</a>
-    </div>
-    <div class="agency-row">
-      <span class="agency-label"><em>九樓</em>僑委會</span>
-      <a href="tel:0777150300" class="agency-phone">07-715-0300</a>
-      <span class="agency-ext">分機 219 或 281</span>
-    </div>
+    <table class="contact-table">
+      <tr>
+        <td class="ct-floor">三樓</td>
+        <td class="ct-name">外交部</td>
+        <td class="ct-title"></td>
+        <td class="ct-phone"><a href="tel:0777156600">07-715-6600</a></td>
+      </tr>
+      <tr>
+        <td class="ct-floor">五樓</td>
+        <td class="ct-name">移民署</td>
+        <td class="ct-title"></td>
+        <td class="ct-phone"><a href="tel:0777151660">07-715-1660</a></td>
+      </tr>
+      <tr>
+        <td class="ct-floor">九樓</td>
+        <td class="ct-name">僑委會</td>
+        <td class="ct-title"></td>
+        <td class="ct-phone"><a href="tel:0777150300">07-715-0300</a><span class="ct-ext">分機 219 或 281</span></td>
+      </tr>
+    </table>
     <div class="info-box-label" style="margin-top:12px;">台北僑委會證照科</div>
-    <div class="agency-row">
-      <span class="agency-label">證照服務</span>
-      <a href="tel:0223272620" class="agency-phone">02-2327-2620</a>
-    </div>
-    <div class="agency-row">
-      <span class="agency-label">劉淑純<small>科員</small></span>
-      <a href="tel:0223272927" class="agency-phone">02-2327-2927</a>
-    </div>
-    <div class="agency-row">
-      <span class="agency-label">鄭翔徽<small>科長</small></span>
-      <a href="tel:0223272928" class="agency-phone">02-2327-2928</a>
-    </div>
+    <table class="contact-table">
+      <tr>
+        <td class="ct-floor"></td>
+        <td class="ct-name">證照服務</td>
+        <td class="ct-title"></td>
+        <td class="ct-phone"><a href="tel:0223272620">02-2327-2620</a></td>
+      </tr>
+      <tr>
+        <td class="ct-floor"></td>
+        <td class="ct-name">劉淑純</td>
+        <td class="ct-title">科員</td>
+        <td class="ct-phone"><a href="tel:0223272927">02-2327-2927</a></td>
+      </tr>
+      <tr>
+        <td class="ct-floor"></td>
+        <td class="ct-name">鄭翔徽</td>
+        <td class="ct-title">科長</td>
+        <td class="ct-phone"><a href="tel:0223272928">02-2327-2928</a></td>
+      </tr>
+    </table>
   </div>
 
   <div class="info-box">
