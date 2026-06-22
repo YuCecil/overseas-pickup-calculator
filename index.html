@@ -8,182 +8,204 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      height: 100dvh;
-      overflow: hidden;
+      min-height: 100vh;
       background: #f0f4f8;
       font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
       display: flex;
       flex-direction: column;
-      padding: 16px 20px 16px;
-      gap: 12px;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 20px;
     }
 
-    /* ── 標頭 ── */
-    header {
-      text-align: center;
-      flex-shrink: 0;
-    }
-
-    header h1 {
-      font-size: 1.2rem;
+    h1 {
+      font-size: 1.4rem;
       color: #555;
+      margin-bottom: 20px;
       letter-spacing: 2px;
-      margin-bottom: 4px;
     }
 
-    header .phone-line {
-      font-size: 1.1rem;
-      color: #555;
-      letter-spacing: 1px;
-    }
-
-    header .phone-line a {
-      color: #1565c0;
-      text-decoration: none;
-      font-weight: bold;
-      font-size: 1.35rem;
-    }
-
-    header .floor-line {
-      font-size: 0.9rem;
-      color: #999;
-      letter-spacing: 2px;
-      margin-top: 2px;
-    }
-
-    /* ── 日期選擇器 ── */
+    /* ── 日期選擇器區塊 ── */
     .date-picker-wrap {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 10px;
+      gap: 12px;
       background: #fff;
-      border-radius: 12px;
-      padding: 10px 18px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-      flex-shrink: 0;
+      border-radius: 14px;
+      padding: 14px 22px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      margin-bottom: 36px;
       flex-wrap: wrap;
+      justify-content: center;
     }
 
-    .date-picker-wrap label { font-size: 0.95rem; color: #555; white-space: nowrap; }
+    .date-picker-wrap label {
+      font-size: 1rem;
+      color: #555;
+      white-space: nowrap;
+    }
 
     #date-input {
-      font-size: 0.95rem;
+      font-size: 1rem;
       font-family: inherit;
       border: 2px solid #d0d8e4;
       border-radius: 8px;
-      padding: 5px 10px;
+      padding: 7px 12px;
       color: #333;
       cursor: pointer;
       outline: none;
       transition: border-color 0.2s;
     }
+
     #date-input:focus { border-color: #1e88e5; }
 
-    #input-weekday { font-size: 0.95rem; color: #444; font-weight: bold; }
-
     #reset-btn {
-      font-size: 0.82rem;
+      font-size: 0.88rem;
       font-family: inherit;
       background: #e8f0fe;
       color: #1565c0;
       border: none;
       border-radius: 8px;
-      padding: 5px 12px;
+      padding: 7px 14px;
       cursor: pointer;
       white-space: nowrap;
       transition: background 0.2s;
     }
+
     #reset-btn:hover { background: #c5d8fb; }
 
+    /* ── 非工作日警告 ── */
     #nonwork-warn {
       display: none;
       align-items: center;
+      gap: 8px;
       background: #fff3cd;
       color: #856404;
       border: 1px solid #ffc107;
       border-radius: 8px;
-      padding: 4px 12px;
-      font-size: 0.82rem;
+      padding: 6px 14px;
+      font-size: 0.88rem;
       white-space: nowrap;
     }
 
-    /* ── 2×2 格 ── */
-    .grid {
-      flex: 1;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      grid-template-rows: 1fr 1fr;
-      gap: 14px;
-      min-height: 0;
+    /* ── 卡片 ── */
+    .cards {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+      max-width: 1000px;
     }
 
-    /* ── 取件卡片 ── */
     .card {
-      border-radius: 18px;
+      flex: 1;
+      min-width: 300px;
+      max-width: 460px;
+      border-radius: 20px;
+      padding: 40px 36px 44px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 16px 20px;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.10);
-      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
     }
 
     .card.blue  { background: linear-gradient(145deg, #1565c0, #1e88e5); color: #fff; }
     .card.green { background: linear-gradient(145deg, #2e7d32, #43a047); color: #fff; }
 
-    .card-title   { font-size: 1.3rem; font-weight: bold; letter-spacing: 2px; margin-bottom: 2px; opacity: .95; }
-    .card-days    { font-size: 0.85rem; opacity: .75; margin-bottom: 10px; }
-    .card-date    { font-size: clamp(2.4rem, 4vw, 3.6rem); font-weight: 900; line-height: 1; margin-bottom: 4px; }
-    .card-weekday { font-size: 1.3rem; font-weight: 600; opacity: .9; }
+    .card-title   { font-size: 1.7rem; font-weight: bold; letter-spacing: 3px; margin-bottom: 10px; opacity: .95; }
+    .card-days    { font-size: 1rem; opacity: .8; margin-bottom: 28px; letter-spacing: 1px; }
+    .card-date    { font-size: 4.2rem; font-weight: 900; line-height: 1; margin-bottom: 10px; letter-spacing: -1px; }
+    .card-weekday { font-size: 1.8rem; font-weight: 600; opacity: .9; margin-bottom: 6px; }
+    .card-full    { font-size: 1.1rem; opacity: .75; margin-top: 4px; }
 
     .days-remaining {
-      margin-top: 10px;
+      margin-top: 20px;
       background: rgba(255,255,255,0.2);
       border-radius: 30px;
-      padding: 5px 18px;
-      font-size: 0.88rem;
+      padding: 8px 22px;
+      font-size: 1rem;
+      letter-spacing: 1px;
     }
 
-    /* ── 役齡卡片 ── */
-    .mil-card {
-      background: #fff;
-      border-radius: 18px;
+    /* ── 役齡區塊 ── */
+    .military-section {
+      margin-top: 36px;
+      width: 100%;
+      max-width: 1000px;
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 16px 20px;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
-      overflow: hidden;
+      gap: 16px;
     }
 
-    .mil-card-label { font-size: 1.1rem; color: #666; letter-spacing: 1px; margin-bottom: 2px; }
-    .mil-card-age   { font-size: 0.85rem; color: #aaa; margin-bottom: 8px; }
-    .mil-card-years { font-size: clamp(1.5rem, 3vw, 2.2rem); font-weight: 900; color: #333; }
+    .military-section h2 {
+      font-size: 1.1rem;
+      color: #666;
+      letter-spacing: 2px;
+      font-weight: normal;
+    }
+
+    .military-cards {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+    }
+
+    .mil-card {
+      flex: 1;
+      min-width: 260px;
+      max-width: 460px;
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 28px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+
+    .mil-card-label {
+      font-size: 1rem;
+      color: #888;
+      margin-bottom: 6px;
+      letter-spacing: 1px;
+    }
+
+    .mil-card-age {
+      font-size: 0.9rem;
+      color: #aaa;
+      margin-bottom: 10px;
+    }
+
+    .mil-card-years {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #333;
+      letter-spacing: 1px;
+    }
+
   </style>
 </head>
 <body>
 
-<header>
-  <h1>僑委會取件日期計算</h1>
-  <div class="phone-line">
-    南部證照服務站　<a href="tel:0777150300">07-715-0300</a>　分機 219 或 281
-  </div>
-  <div class="floor-line">三樓 外交部　｜　五樓 移民署</div>
-</header>
+<h1>僑委會取件日期計算</h1>
+<p style="font-size:1.25rem;color:#555;margin-bottom:10px;letter-spacing:1px;">
+  南部證照服務站　<a href="tel:0777150300" style="color:#1565c0;text-decoration:none;font-weight:bold;font-size:1.5rem;">07-715-0300</a>　分機 219 或 281
+</p>
+<p style="font-size:1rem;color:#888;margin-bottom:22px;letter-spacing:2px;">
+  三樓 外交部　｜　五樓 移民署
+</p>
 
 <div class="date-picker-wrap">
   <label for="date-input">辦理日期：</label>
   <input type="date" id="date-input">
-  <span id="input-weekday"></span>
+  <span id="input-weekday" style="font-size:1rem;color:#444;font-weight:bold;min-width:4em;"></span>
   <button id="reset-btn">回到今天</button>
   <span id="nonwork-warn">⚠️ 非工作日，已自動調整至下一個工作日</span>
 </div>
 
-<div class="grid">
-  <!-- 取件卡 -->
+<div class="cards">
   <div class="card green">
     <div class="card-title">僑民身分證明書</div>
     <div class="card-days">3 個工作天</div>
@@ -191,6 +213,7 @@
     <div class="card-weekday" id="d2-weekday"></div>
     <div class="days-remaining" id="d2-remain"></div>
   </div>
+
   <div class="card blue">
     <div class="card-title">僑居加簽</div>
     <div class="card-days">4 個工作天</div>
@@ -198,99 +221,147 @@
     <div class="card-weekday" id="d1-weekday"></div>
     <div class="days-remaining" id="d1-remain"></div>
   </div>
+</div>
 
-  <!-- 役齡卡 -->
-  <div class="mil-card">
-    <div class="mil-card-label">接近役齡男子</div>
-    <div class="mil-card-age">16 ～ 18 歲</div>
-    <div class="mil-card-years" id="mil-near"></div>
+<!-- 役齡查詢 -->
+<div class="military-section">
+  <h2>役齡參考（依今年自動計算）</h2>
+  <div class="military-cards">
+    <div class="mil-card">
+      <div class="mil-card-label">接近役齡男子</div>
+      <div class="mil-card-age">16 ~ 18 歲</div>
+      <div class="mil-card-years" id="mil-near"></div>
+    </div>
+    <div class="mil-card">
+      <div class="mil-card-label">役齡男子</div>
+      <div class="mil-card-age">19 ~ 36 歲</div>
+      <div class="mil-card-years" id="mil-active"></div>
+    </div>
   </div>
-  <div class="mil-card">
-    <div class="mil-card-label">役齡男子</div>
-    <div class="mil-card-age">19 ～ 36 歲</div>
-    <div class="mil-card-years" id="mil-active"></div>
   </div>
 </div>
 
 <script>
+  // ── 115 年（2026）政府行政機關非工作日（週末以外）──
   const EXTRA_HOLIDAYS = new Set([
-    '2026-01-01',
-    '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',
-    '2026-02-27',
-    '2026-04-03',
-    '2026-05-01',
-    '2026-06-19',
-    '2026-09-25',
-    '2026-09-28',
-    '2026-10-09',
-    '2026-10-26',
-    '2026-12-25',
+    '2026-01-01',                                                         // 元旦
+    '2026-02-16','2026-02-17','2026-02-18','2026-02-19','2026-02-20',    // 春節
+    '2026-02-27',                                                         // 和平紀念日補假
+    '2026-04-03',                                                         // 兒童節+清明補假
+    '2026-05-01',                                                         // 勞動節
+    '2026-06-19',                                                         // 端午節
+    '2026-09-25',                                                         // 中秋節
+    '2026-09-28',                                                         // 孔子誕辰/教師節
+    '2026-10-09',                                                         // 國慶日補假
+    '2026-10-26',                                                         // 臺灣光復節補假
+    '2026-12-25',                                                         // 行憲紀念日
   ]);
 
   const WEEKDAYS = ['日','一','二','三','四','五','六'];
 
+  // 取得台灣今日（UTC+8）的 yyyy-mm-dd 字串
   function getTaiwanToday() {
-    const tw = new Date(Date.now() + 8 * 3600000);
+    const now = new Date();
+    // 轉換成台灣時間
+    const tw = new Date(now.getTime() + 8 * 60 * 60 * 1000);
     return tw.toISOString().slice(0, 10);
   }
 
+  // 從 yyyy-mm-dd 建立 UTC 午夜 Date（避免時區偏移）
   function parseDate(str) {
     const [y, m, d] = str.split('-').map(Number);
     return new Date(Date.UTC(y, m - 1, d));
   }
 
   function toKey(date) {
-    return `${date.getUTCFullYear()}-${String(date.getUTCMonth()+1).padStart(2,'0')}-${String(date.getUTCDate()).padStart(2,'0')}`;
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
   function isNonWorkingDay(date) {
-    const dow = date.getUTCDay();
-    return dow === 0 || dow === 6 || EXTRA_HOLIDAYS.has(toKey(date));
+    const dow = date.getUTCDay(); // 0=Sun, 6=Sat
+    if (dow === 0 || dow === 6) return true;
+    return EXTRA_HOLIDAYS.has(toKey(date));
   }
 
   function addWorkingDays(base, n) {
     const d = new Date(base);
     let count = 0;
-    while (count < n) { d.setUTCDate(d.getUTCDate() + 1); if (!isNonWorkingDay(d)) count++; }
+    while (count < n) {
+      d.setUTCDate(d.getUTCDate() + 1);
+      if (!isNonWorkingDay(d)) count++;
+    }
     return d;
   }
 
-  function nearestWorkingDay(str) {
-    const d = parseDate(str);
-    while (isNonWorkingDay(d)) d.setUTCDate(d.getUTCDate() + 1);
+  function daysBetween(a, b) {
+    return Math.round((b - a) / 86400000);
+  }
+
+  function formatCard(prefix, pickupDate, baseDate) {
+    const m    = pickupDate.getUTCMonth() + 1;
+    const d    = pickupDate.getUTCDate();
+    const dow  = WEEKDAYS[pickupDate.getUTCDay()];
+    const diff = daysBetween(baseDate, pickupDate);
+
+    document.getElementById(prefix + '-date').textContent    = `${m}月${d}日`;
+    document.getElementById(prefix + '-weekday').textContent = `星期${dow}`;
+    document.getElementById(prefix + '-remain').textContent  =
+      diff === 0 ? '今天可取件' : `距今 ${diff} 天後可取件`;
+  }
+
+  // 找到當日或之後最近的工作日
+  function nearestWorkingDay(dateStr) {
+    const d = parseDate(dateStr);
+    while (isNonWorkingDay(d)) {
+      d.setUTCDate(d.getUTCDate() + 1);
+    }
     return toKey(d);
   }
 
-  function formatCard(prefix, pickup, base) {
-    const m = pickup.getUTCMonth() + 1, d = pickup.getUTCDate();
-    const diff = Math.round((pickup - base) / 86400000);
-    document.getElementById(prefix+'-date').textContent    = `${m}月${d}日`;
-    document.getElementById(prefix+'-weekday').textContent = `星期${WEEKDAYS[pickup.getUTCDay()]}`;
-    document.getElementById(prefix+'-remain').textContent  = diff === 0 ? '今天可取件' : `距今 ${diff} 天後可取件`;
-  }
-
-  const input = document.getElementById('date-input');
-  const warn  = document.getElementById('nonwork-warn');
-
-  function setDate(str) {
-    const adj = nearestWorkingDay(str);
-    input.value = adj;
-    warn.style.display = adj !== str ? 'flex' : 'none';
-    const d = parseDate(adj);
-    document.getElementById('input-weekday').textContent = `（星期${WEEKDAYS[d.getUTCDay()]}）`;
-    const base = parseDate(adj);
+  function calculate(dateStr) {
+    const base = parseDate(dateStr);
     formatCard('d1', addWorkingDays(base, 4), base);
     formatCard('d2', addWorkingDays(base, 3), base);
   }
 
-  setDate(getTaiwanToday());
-  input.addEventListener('change', () => { if (input.value) setDate(input.value); });
-  document.getElementById('reset-btn').addEventListener('click', () => setDate(getTaiwanToday()));
+  const input    = document.getElementById('date-input');
+  const resetBtn = document.getElementById('reset-btn');
+  const warn     = document.getElementById('nonwork-warn');
 
-  // 役齡
-  const y = parseInt(getTaiwanToday().slice(0, 4));
-  document.getElementById('mil-near').textContent   = `${y-18} 年 ～ ${y-16} 年出生`;
-  document.getElementById('mil-active').textContent = `${y-36} 年 ～ ${y-19} 年出生`;
+  function setDate(dateStr) {
+    const adjusted = nearestWorkingDay(dateStr);
+    const wasAdjusted = adjusted !== dateStr;
+    input.value = adjusted;
+    warn.style.display = wasAdjusted ? 'flex' : 'none';
+    // 顯示辦理日期星期
+    const d = parseDate(adjusted);
+    document.getElementById('input-weekday').textContent = `（星期${WEEKDAYS[d.getUTCDay()]}）`;
+    calculate(adjusted);
+  }
+
+  setDate(getTaiwanToday());
+
+  input.addEventListener('change', () => {
+    if (input.value) setDate(input.value);
+  });
+
+  resetBtn.addEventListener('click', () => {
+    setDate(getTaiwanToday());
+  });
+
+  // ── 役齡計算 ──
+  (function() {
+    const y = parseInt(getTaiwanToday().slice(0, 4));
+    // 接近役齡：出生年 = y-18 ~ y-16
+    document.getElementById('mil-near').textContent =
+      `${y - 18} 年 ～ ${y - 16} 年出生`;
+    // 役齡：出生年 = y-36 ~ y-19
+    document.getElementById('mil-active').textContent =
+      `${y - 36} 年 ～ ${y - 19} 年出生`;
+  })();
 </script>
 </body>
 </html>
