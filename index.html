@@ -243,11 +243,6 @@
     <div class="info-box-label">役齡參考（依今年自動計算）</div>
     <div class="mil-rows">
       <div class="mil-item">
-        <div class="mil-item-label">接近役齡男子</div>
-        <div class="mil-item-age">16 ～ 18 歲</div>
-        <div class="mil-item-years" id="mil-near"></div>
-      </div>
-      <div class="mil-item">
         <div class="mil-item-label">役齡男子</div>
         <div class="mil-item-age">19 ～ 36 歲</div>
         <div class="mil-item-years" id="mil-active"></div>
@@ -333,7 +328,6 @@
 
   // 役齡
   const y = parseInt(getTaiwanToday().slice(0, 4));
-  document.getElementById('mil-near').textContent   = `${y-18} ～ ${y-16} 年出生`;
   document.getElementById('mil-active').textContent = `${y-36} ～ ${y-19} 年出生`;
 </script>
 </body>
