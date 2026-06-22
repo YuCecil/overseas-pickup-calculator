@@ -185,21 +185,9 @@
       letter-spacing: 0.5px;
       white-space: nowrap;
       margin-left: 16px;
+      font-variant-numeric: tabular-nums;
     }
-    .contact-ext {
-      font-size: 0.72rem;
-      color: #aaa;
-      text-align: right;
-      margin-top: 1px;
-    }
-
-    .phone-stack {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      margin-left: 16px;
-    }
-    .phone-stack .contact-phone { margin-left: 0; }
+    .contact-label small { white-space: nowrap; }
 
     /* 役齡條 */
     .mil-strip {
@@ -271,11 +259,8 @@
       <a href="tel:0777151660" class="contact-phone">07-715-1660</a>
     </div>
     <div class="contact-row">
-      <span class="contact-label"><em>九樓</em>僑委會</span>
-      <span class="phone-stack">
-        <a href="tel:0777150300" class="contact-phone">07-715-0300</a>
-        <span class="contact-ext">分機 219 或 281</span>
-      </span>
+      <span class="contact-label"><em>九樓</em>僑委會<small>分機 219 或 281</small></span>
+      <a href="tel:0777150300" class="contact-phone">07-715-0300</a>
     </div>
   </div>
 
