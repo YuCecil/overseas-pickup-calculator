@@ -214,6 +214,64 @@
       color: #333;
       letter-spacing: 0.5px;
     }
+    /* ── 小月曆 ── */
+    .mini-cal {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 14px 14px 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.14);
+      width: 196px;
+      z-index: 100;
+      font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
+    }
+    .mini-cal-header {
+      text-align: center;
+      font-size: 0.8rem;
+      font-weight: bold;
+      color: #555;
+      margin-bottom: 8px;
+      letter-spacing: 1px;
+    }
+    .mini-cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
+    }
+    .mini-cal-dh {
+      text-align: center;
+      font-size: 0.6rem;
+      color: #ccc;
+      padding-bottom: 4px;
+    }
+    .mini-cal-day, .mini-cal-empty {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 1px auto;
+      font-size: 0.72rem;
+      line-height: 1;
+    }
+    .mc-work    { color: #333; }
+    .mc-nonwork { color: #e57373; }
+    .mc-holiday { background: #ffeaea; }
+    .mc-today   { background: #1565c0 !important; color: #fff !important; font-weight: bold; }
+    .mc-past    { opacity: 0.4; }
+    .mini-cal-legend {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 8px;
+      font-size: 0.58rem;
+      color: #aaa;
+    }
+    .mini-cal-legend span { display: flex; align-items: center; gap: 3px; }
+    .ld { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -280,6 +338,9 @@
     </div>
   </div>
 </div>
+
+<!-- 小月曆 -->
+<div id="mini-cal" class="mini-cal"></div>
 
 <!-- 役齡條 -->
 <div class="mil-strip">
@@ -361,6 +422,49 @@
   setDate(getTaiwanToday());
   input.addEventListener('change', () => { if (input.value) setDate(input.value); });
   document.getElementById('reset-btn').addEventListener('click', () => setDate(getTaiwanToday()));
+
+  // 小月曆
+  (function() {
+    const today = getTaiwanToday();
+    const [ty, tm, td] = today.split('-').map(Number);
+    const firstDay = new Date(Date.UTC(ty, tm - 1, 1));
+    const totalDays = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
+    const startDow  = firstDay.getUTCDay();
+
+    let html = `<div class="mini-cal-header">${ty} 年 ${tm} 月</div>`;
+    html += `<div class="mini-cal-grid">`;
+    ['日','一','二','三','四','五','六'].forEach(h => {
+      html += `<div class="mini-cal-dh">${h}</div>`;
+    });
+    for (let i = 0; i < startDow; i++) html += `<div class="mini-cal-empty"></div>`;
+
+    for (let d = 1; d <= totalDays; d++) {
+      const ds  = `${ty}-${String(tm).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(Date.UTC(ty, tm - 1, d)).getUTCDay();
+      const isToday   = d === td;
+      const isHol     = EXTRA_HOLIDAYS.has(ds);
+      const isWeekend = dow === 0 || dow === 6;
+      const isPast    = d < td;
+
+      let cls = 'mini-cal-day';
+      if (isPast) cls += ' mc-past';
+      if (isToday) cls += ' mc-today';
+      else if (isHol && !isWeekend) cls += ' mc-nonwork mc-holiday';
+      else if (isWeekend || isHol)  cls += ' mc-nonwork';
+      else cls += ' mc-work';
+
+      html += `<div class="${cls}">${d}</div>`;
+    }
+
+    html += `</div>`;
+    html += `<div class="mini-cal-legend">`;
+    html += `<span><span class="ld" style="background:#1565c0"></span>今天</span>`;
+    html += `<span><span class="ld" style="background:#e57373"></span>非工作日</span>`;
+    html += `<span><span class="ld" style="background:#ffeaea;border:1px solid #e57373"></span>假日</span>`;
+    html += `</div>`;
+
+    document.getElementById('mini-cal').innerHTML = html;
+  })();
 
   // 役齡
   const y = parseInt(getTaiwanToday().slice(0, 4));
