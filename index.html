@@ -225,10 +225,21 @@
       box-shadow: 0 4px 24px rgba(0,0,0,0.14);
       width: 210px;
       z-index: 100;
-      resize: both;
-      overflow: hidden;
-      min-width: 180px;
-      min-height: 200px;
+      transform-origin: top left;
+    }
+    .cal-resize {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: 14px;
+      height: 14px;
+      cursor: nwse-resize;
+      user-select: none;
+      opacity: 0.35;
+      background:
+        linear-gradient(135deg, transparent 55%, #666 55%, #666 65%, transparent 65%),
+        linear-gradient(135deg, transparent 70%, #666 70%, #666 80%, transparent 80%),
+        linear-gradient(135deg, transparent 85%, #666 85%, #666 95%, transparent 95%);
     }
     .mini-cal-nav {
       display: flex;
@@ -387,6 +398,7 @@
     <span><span class="ld" style="background:#e57373"></span>非工作日</span>
     <span><span class="ld" style="background:#ffeaea;border:1px solid #e57373"></span>國定假日</span>
   </div>
+  <div class="cal-resize" id="cal-resize"></div>
 </div>
 
 <script>
@@ -532,6 +544,21 @@
       dragging = false;
       navEl.classList.remove('dragging');
     });
+
+    // 等比例縮放（右下角把手）
+    let currentScale = 1, resizing = false, rsx = 0, rsy = 0, rss = 1;
+    document.getElementById('cal-resize').addEventListener('mousedown', e => {
+      resizing = true;
+      rsx = e.clientX; rsy = e.clientY; rss = currentScale;
+      e.preventDefault(); e.stopPropagation();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!resizing) return;
+      const delta = (e.clientX - rsx + e.clientY - rsy) / 160;
+      currentScale = Math.max(0.5, Math.min(2.5, rss + delta));
+      calEl.style.transform = `scale(${currentScale})`;
+    });
+    document.addEventListener('mouseup', () => { resizing = false; });
   })();
 
   // 役齡
