@@ -225,13 +225,20 @@
       box-shadow: 0 4px 24px rgba(0,0,0,0.14);
       width: 210px;
       z-index: 100;
+      resize: both;
+      overflow: hidden;
+      min-width: 180px;
+      min-height: 200px;
     }
     .mini-cal-nav {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 8px;
+      cursor: grab;
+      user-select: none;
     }
+    .mini-cal-nav.dragging { cursor: grabbing; }
     .mini-cal-nav button {
       background: none;
       border: none;
@@ -269,13 +276,12 @@
       padding-bottom: 3px;
     }
     .mini-cal-day {
-      width: 24px;
-      height: 24px;
+      width: 100%;
+      aspect-ratio: 1;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 1px auto;
       font-size: 0.7rem;
       line-height: 1;
     }
@@ -499,6 +505,33 @@
     document.getElementById('cal-next').onclick = () => {
       calM++; if (calM > 12) { calM = 1; calY++; } drawCal();
     };
+
+    // 拖曳移動
+    const calEl = document.querySelector('.mini-cal');
+    const navEl = calEl.querySelector('.mini-cal-nav');
+    let dragging = false, ox = 0, oy = 0, ol = 0, ot = 0;
+    navEl.addEventListener('mousedown', e => {
+      if (e.target.tagName === 'BUTTON') return;
+      dragging = true;
+      ox = e.clientX; oy = e.clientY;
+      const r = calEl.getBoundingClientRect();
+      ol = r.left; ot = r.top;
+      calEl.style.left = ol + 'px';
+      calEl.style.top  = ot + 'px';
+      calEl.style.right  = 'auto';
+      calEl.style.bottom = 'auto';
+      navEl.classList.add('dragging');
+      e.preventDefault();
+    });
+    document.addEventListener('mousemove', e => {
+      if (!dragging) return;
+      calEl.style.left = Math.max(0, ol + e.clientX - ox) + 'px';
+      calEl.style.top  = Math.max(0, ot + e.clientY - oy) + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+      dragging = false;
+      navEl.classList.remove('dragging');
+    });
   })();
 
   // 役齡
