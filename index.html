@@ -216,61 +216,85 @@
     }
     /* ── 小月曆 ── */
     .mini-cal {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
+      width: 100%;
+      max-width: 1000px;
+      margin-top: 12px;
       background: #fff;
       border-radius: 14px;
-      padding: 14px 14px 10px;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.14);
-      width: 196px;
-      z-index: 100;
-      font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
+      padding: 14px 24px 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
+    .mini-cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+    .mini-cal-nav button {
+      background: none;
+      border: none;
+      font-size: 1.1rem;
+      cursor: pointer;
+      color: #999;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+      font-family: inherit;
+    }
+    .mini-cal-nav button:hover { background: #f0f4f8; color: #333; }
     .mini-cal-header {
-      text-align: center;
-      font-size: 0.8rem;
+      font-size: 0.84rem;
       font-weight: bold;
       color: #555;
-      margin-bottom: 8px;
       letter-spacing: 1px;
+      min-width: 96px;
+      text-align: center;
     }
     .mini-cal-grid {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      gap: 1px;
+      grid-template-columns: repeat(7, 34px);
+      gap: 3px;
+      justify-content: center;
     }
     .mini-cal-dh {
       text-align: center;
-      font-size: 0.6rem;
+      font-size: 0.62rem;
       color: #ccc;
-      padding-bottom: 4px;
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .mini-cal-day, .mini-cal-empty {
-      width: 24px;
-      height: 24px;
+    .mini-cal-day {
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 1px auto;
-      font-size: 0.72rem;
+      font-size: 0.78rem;
       line-height: 1;
     }
     .mc-work    { color: #333; }
     .mc-nonwork { color: #e57373; }
     .mc-holiday { background: #ffeaea; }
     .mc-today   { background: #1565c0 !important; color: #fff !important; font-weight: bold; }
-    .mc-past    { opacity: 0.4; }
+    .mc-past    { opacity: 0.38; }
     .mini-cal-legend {
       display: flex;
-      gap: 10px;
+      gap: 14px;
       justify-content: center;
-      margin-top: 8px;
-      font-size: 0.58rem;
+      margin-top: 10px;
+      font-size: 0.62rem;
       color: #aaa;
     }
-    .mini-cal-legend span { display: flex; align-items: center; gap: 3px; }
+    .mini-cal-legend span { display: flex; align-items: center; gap: 4px; }
     .ld { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   </style>
 </head>
@@ -339,13 +363,25 @@
   </div>
 </div>
 
-<!-- 小月曆 -->
-<div id="mini-cal" class="mini-cal"></div>
-
 <!-- 役齡條 -->
 <div class="mil-strip">
   <span class="mil-strip-label">役齡男子</span>
   <span class="mil-strip-years" id="mil-active"></span>
+</div>
+
+<!-- 小月曆 -->
+<div class="mini-cal">
+  <div class="mini-cal-nav">
+    <button id="cal-prev">&#8249;</button>
+    <span id="cal-header" class="mini-cal-header"></span>
+    <button id="cal-next">&#8250;</button>
+  </div>
+  <div id="cal-grid" class="mini-cal-grid"></div>
+  <div class="mini-cal-legend">
+    <span><span class="ld" style="background:#1565c0"></span>今天</span>
+    <span><span class="ld" style="background:#e57373"></span>非工作日</span>
+    <span><span class="ld" style="background:#ffeaea;border:1px solid #e57373"></span>平日假日</span>
+  </div>
 </div>
 
 <script>
@@ -427,43 +463,43 @@
   (function() {
     const today = getTaiwanToday();
     const [ty, tm, td] = today.split('-').map(Number);
-    const firstDay = new Date(Date.UTC(ty, tm - 1, 1));
-    const totalDays = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
-    const startDow  = firstDay.getUTCDay();
+    const todayMs = Date.UTC(ty, tm - 1, td);
+    let calY = ty, calM = tm;
 
-    let html = `<div class="mini-cal-header">${ty} 年 ${tm} 月</div>`;
-    html += `<div class="mini-cal-grid">`;
-    ['日','一','二','三','四','五','六'].forEach(h => {
-      html += `<div class="mini-cal-dh">${h}</div>`;
-    });
-    for (let i = 0; i < startDow; i++) html += `<div class="mini-cal-empty"></div>`;
-
-    for (let d = 1; d <= totalDays; d++) {
-      const ds  = `${ty}-${String(tm).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const dow = new Date(Date.UTC(ty, tm - 1, d)).getUTCDay();
-      const isToday   = d === td;
-      const isHol     = EXTRA_HOLIDAYS.has(ds);
-      const isWeekend = dow === 0 || dow === 6;
-      const isPast    = d < td;
-
-      let cls = 'mini-cal-day';
-      if (isPast) cls += ' mc-past';
-      if (isToday) cls += ' mc-today';
-      else if (isHol && !isWeekend) cls += ' mc-nonwork mc-holiday';
-      else if (isWeekend || isHol)  cls += ' mc-nonwork';
-      else cls += ' mc-work';
-
-      html += `<div class="${cls}">${d}</div>`;
+    function drawCal() {
+      const totalDays = new Date(Date.UTC(calY, calM, 0)).getUTCDate();
+      const startDow  = new Date(Date.UTC(calY, calM - 1, 1)).getUTCDay();
+      document.getElementById('cal-header').textContent = `${calY} 年 ${calM} 月`;
+      let html = '';
+      ['日','一','二','三','四','五','六'].forEach(h => {
+        html += `<div class="mini-cal-dh">${h}</div>`;
+      });
+      for (let i = 0; i < startDow; i++) html += `<div></div>`;
+      for (let d = 1; d <= totalDays; d++) {
+        const ds  = `${calY}-${String(calM).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const dow = new Date(Date.UTC(calY, calM - 1, d)).getUTCDay();
+        const isToday   = ds === today;
+        const isHol     = EXTRA_HOLIDAYS.has(ds);
+        const isWeekend = dow === 0 || dow === 6;
+        const isPast    = Date.UTC(calY, calM - 1, d) < todayMs;
+        let cls = 'mini-cal-day';
+        if (isPast)   cls += ' mc-past';
+        if (isToday)  cls += ' mc-today';
+        else if (isHol && !isWeekend) cls += ' mc-nonwork mc-holiday';
+        else if (isWeekend || isHol)  cls += ' mc-nonwork';
+        else cls += ' mc-work';
+        html += `<div class="${cls}">${d}</div>`;
+      }
+      document.getElementById('cal-grid').innerHTML = html;
     }
 
-    html += `</div>`;
-    html += `<div class="mini-cal-legend">`;
-    html += `<span><span class="ld" style="background:#1565c0"></span>今天</span>`;
-    html += `<span><span class="ld" style="background:#e57373"></span>非工作日</span>`;
-    html += `<span><span class="ld" style="background:#ffeaea;border:1px solid #e57373"></span>假日</span>`;
-    html += `</div>`;
-
-    document.getElementById('mini-cal').innerHTML = html;
+    drawCal();
+    document.getElementById('cal-prev').onclick = () => {
+      calM--; if (calM < 1) { calM = 12; calY--; } drawCal();
+    };
+    document.getElementById('cal-next').onclick = () => {
+      calM++; if (calM > 12) { calM = 1; calY++; } drawCal();
+    };
   })();
 
   // 役齡
