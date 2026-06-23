@@ -214,71 +214,69 @@
       color: #333;
       letter-spacing: 0.5px;
     }
-    /* ── 小月曆 ── */
+    /* ── 小月曆（浮動） ── */
     .mini-cal {
-      width: 100%;
-      max-width: 1000px;
-      margin-top: 12px;
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
       background: #fff;
       border-radius: 14px;
-      padding: 14px 24px 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      padding: 12px 12px 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.14);
+      width: 210px;
+      z-index: 100;
     }
     .mini-cal-nav {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 14px;
-      margin-bottom: 10px;
+      justify-content: space-between;
+      margin-bottom: 8px;
     }
     .mini-cal-nav button {
       background: none;
       border: none;
-      font-size: 1.1rem;
+      font-size: 1rem;
       cursor: pointer;
-      color: #999;
-      width: 28px;
-      height: 28px;
+      color: #aaa;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       transition: background 0.15s;
       font-family: inherit;
+      flex-shrink: 0;
     }
     .mini-cal-nav button:hover { background: #f0f4f8; color: #333; }
     .mini-cal-header {
-      font-size: 0.84rem;
+      font-size: 0.78rem;
       font-weight: bold;
       color: #555;
-      letter-spacing: 1px;
-      min-width: 96px;
+      letter-spacing: 0.5px;
       text-align: center;
+      flex: 1;
     }
     .mini-cal-grid {
       display: grid;
-      grid-template-columns: repeat(7, 34px);
-      gap: 3px;
-      justify-content: center;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 1px;
     }
     .mini-cal-dh {
       text-align: center;
-      font-size: 0.62rem;
+      font-size: 0.58rem;
       color: #ccc;
-      height: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      padding-bottom: 3px;
     }
     .mini-cal-day {
-      width: 30px;
-      height: 30px;
+      width: 24px;
+      height: 24px;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       margin: 1px auto;
-      font-size: 0.78rem;
+      font-size: 0.7rem;
       line-height: 1;
     }
     .mc-work    { color: #333; }
@@ -288,14 +286,15 @@
     .mc-past    { opacity: 0.38; }
     .mini-cal-legend {
       display: flex;
-      gap: 14px;
+      gap: 8px;
       justify-content: center;
-      margin-top: 10px;
-      font-size: 0.62rem;
+      margin-top: 8px;
+      font-size: 0.58rem;
       color: #aaa;
+      flex-wrap: wrap;
     }
-    .mini-cal-legend span { display: flex; align-items: center; gap: 4px; }
-    .ld { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .mini-cal-legend span { display: flex; align-items: center; gap: 3px; }
+    .ld { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
   </style>
 </head>
 <body>
