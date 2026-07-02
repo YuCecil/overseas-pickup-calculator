@@ -21,7 +21,7 @@
     }
 
     body.status-open   { background: #e8f5e9; }
-    body.status-lunch  { background: #fff8e1; }
+    body.status-lunch  { background: #f0f4f8; }
     body.status-closed { background: #f0f4f8; }
 
     .station-name {
@@ -77,9 +77,9 @@
       box-shadow: 0 8px 32px rgba(46,125,50,0.35);
     }
     .status-badge.lunch {
-      background: #e65100;
+      background: #757575;
       color: #fff;
-      box-shadow: 0 8px 32px rgba(230,81,0,0.35);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.15);
     }
     .status-badge.closed {
       background: #e0e0e0;
@@ -223,7 +223,7 @@
       text.textContent = '服務中';
       dot.className = 'status-dot pulse';
     } else if (status === 'lunch') {
-      text.textContent = '午休中';
+      text.textContent = '休息中';
       dot.className = 'status-dot pulse';
     } else {
       text.textContent = '非服務時間';
