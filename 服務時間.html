@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>僑委會南部證照服務站</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
+      background: #f0f4f8;
+      padding: 32px 20px;
+      gap: 28px;
+      transition: background 0.6s;
+    }
+
+    body.status-open   { background: #e8f5e9; }
+    body.status-lunch  { background: #fff8e1; }
+    body.status-closed { background: #f0f4f8; }
+
+    .station-name {
+      font-size: 0.82rem;
+      letter-spacing: 4px;
+      color: #999;
+      text-transform: uppercase;
+    }
+
+    /* 時鐘卡片 */
+    .clock-card {
+      background: #fff;
+      border-radius: 24px;
+      padding: 36px 56px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-width: 340px;
+    }
+
+    .clock-time {
+      font-size: 4.8rem;
+      font-weight: 900;
+      color: #1a1a2e;
+      letter-spacing: -2px;
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+      line-height: 1;
+    }
+
+    .clock-date {
+      font-size: 1rem;
+      color: #888;
+      letter-spacing: 1px;
+    }
+
+    /* 狀態徽章 */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 40px;
+      border-radius: 50px;
+      font-size: 1.8rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+      transition: background 0.4s, color 0.4s;
+    }
+
+    .status-badge.open {
+      background: #2e7d32;
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(46,125,50,0.3);
+    }
+    .status-badge.lunch {
+      background: #e65100;
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(230,81,0,0.3);
+    }
+    .status-badge.closed {
+      background: #e0e0e0;
+      color: #999;
+      box-shadow: none;
+    }
+
+    .status-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: currentColor;
+      opacity: 0.85;
+    }
+
+    .status-dot.pulse {
+      animation: pulse 1.6s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 0.85; transform: scale(1); }
+      50%       { opacity: 0.4;  transform: scale(0.7); }
+    }
+
+    /* 服務時間表 */
+    .hours-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 20px 40px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 280px;
+    }
+
+    .hours-title {
+      font-size: 0.72rem;
+      color: #bbb;
+      letter-spacing: 3px;
+      text-align: center;
+      margin-bottom: 2px;
+    }
+
+    .hours-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .hours-label {
+      font-size: 0.85rem;
+      color: #aaa;
+      letter-spacing: 1px;
+      white-space: nowrap;
+    }
+
+    .hours-time {
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: #333;
+      letter-spacing: 1px;
+      font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+    }
+
+    .hours-divider {
+      height: 1px;
+      background: #f2f2f2;
+    }
+  </style>
+</head>
+<body>
+
+<span class="station-name">僑委會南部證照服務站</span>
+
+<div class="clock-card">
+  <div class="clock-time" id="clock-time">--:--:--</div>
+  <div class="clock-date" id="clock-date"></div>
+</div>
+
+<div class="status-badge" id="status-badge">
+  <span class="status-dot" id="status-dot"></span>
+  <span id="status-text"></span>
+</div>
+
+<div class="hours-card">
+  <div class="hours-title">服務時間（週一至週五）</div>
+  <div class="hours-row">
+    <span class="hours-label">上午</span>
+    <span class="hours-time">08:30 – 12:00</span>
+  </div>
+  <div class="hours-divider"></div>
+  <div class="hours-row">
+    <span class="hours-label">下午</span>
+    <span class="hours-time">13:30 – 17:00</span>
+  </div>
+</div>
+
+<script>
+  const WEEKDAYS = ['星期日','星期一','星期二','星期三','星期四','星期五','星期六'];
+
+  function getTaiwanNow() {
+    const now = new Date(Date.now() + 8 * 3600000);
+    return {
+      hours:   now.getUTCHours(),
+      minutes: now.getUTCMinutes(),
+      seconds: now.getUTCSeconds(),
+      day:     now.getUTCDay(),
+      year:    now.getUTCFullYear(),
+      month:   now.getUTCMonth() + 1,
+      date:    now.getUTCDate(),
+    };
+  }
+
+  function pad(n) { return String(n).padStart(2, '0'); }
+
+  function getStatus(t) {
+    const isWeekday = t.day >= 1 && t.day <= 5;
+    if (!isWeekday) return 'closed';
+    const mins = t.hours * 60 + t.minutes;
+    if (mins >= 8*60+30 && mins < 12*60)   return 'open';
+    if (mins >= 12*60  && mins < 13*60+30) return 'lunch';
+    if (mins >= 13*60+30 && mins < 17*60)  return 'open';
+    return 'closed';
+  }
+
+  function tick() {
+    const t = getTaiwanNow();
+
+    document.getElementById('clock-time').textContent =
+      `${pad(t.hours)}:${pad(t.minutes)}:${pad(t.seconds)}`;
+    document.getElementById('clock-date').textContent =
+      `${t.year}年${t.month}月${t.date}日　${WEEKDAYS[t.day]}`;
+
+    const status = getStatus(t);
+    const badge  = document.getElementById('status-badge');
+    const dot    = document.getElementById('status-dot');
+    const text   = document.getElementById('status-text');
+
+    badge.className = 'status-badge ' + status;
+    document.body.className = 'status-' + status;
+
+    if (status === 'open') {
+      text.textContent = '服務中';
+      dot.className = 'status-dot pulse';
+    } else if (status === 'lunch') {
+      text.textContent = '午休中';
+      dot.className = 'status-dot pulse';
+    } else {
+      text.textContent = '非服務時間';
+      dot.className = 'status-dot';
+    }
+  }
+
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
