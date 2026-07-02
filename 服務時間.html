@@ -16,7 +16,7 @@
       justify-content: center;
       font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
       background: #f0f4f8;
-      gap: 3vh;
+      gap: 2vh;
       transition: background 0.6s;
     }
 
@@ -25,7 +25,7 @@
     body.status-closed { background: #f0f4f8; }
 
     .station-name {
-      font-size: 2.4vw;
+      font-size: min(2.4vw, 3.8vh);
       font-weight: bold;
       letter-spacing: 0.4em;
       color: #888;
@@ -34,17 +34,17 @@
     /* 時鐘 */
     .clock-card {
       background: #fff;
-      border-radius: 2.5vw;
-      padding: 3vh 6vw;
+      border-radius: min(2.5vw, 2vh);
+      padding: 2vh 5vw;
       box-shadow: 0 8px 40px rgba(0,0,0,0.10);
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 1.2vh;
+      gap: 1vh;
     }
 
     .clock-time {
-      font-size: 18vw;
+      font-size: min(18vw, 20vh);
       font-weight: 900;
       color: #1a1a2e;
       letter-spacing: -0.03em;
@@ -53,7 +53,7 @@
     }
 
     .clock-date {
-      font-size: 2.8vw;
+      font-size: min(2.8vw, 4vh);
       color: #888;
       letter-spacing: 0.15em;
     }
@@ -63,9 +63,9 @@
       display: flex;
       align-items: center;
       gap: 1.2vw;
-      padding: 2vh 6vw;
+      padding: 1.5vh 5vw;
       border-radius: 100px;
-      font-size: 5.5vw;
+      font-size: min(5.5vw, 9vh);
       font-weight: 900;
       letter-spacing: 0.2em;
       transition: background 0.4s, color 0.4s, box-shadow 0.4s;
@@ -88,8 +88,8 @@
     }
 
     .status-dot {
-      width: 1.4vw;
-      height: 1.4vw;
+      width: min(1.4vw, 2vh);
+      height: min(1.4vw, 2vh);
       border-radius: 50%;
       background: currentColor;
       opacity: 0.85;
@@ -106,16 +106,16 @@
     /* 服務時間 */
     .hours-card {
       background: #fff;
-      border-radius: 2vw;
-      padding: 2.5vh 5vw;
+      border-radius: min(2vw, 1.8vh);
+      padding: 1.8vh 5vw;
       box-shadow: 0 4px 16px rgba(0,0,0,0.07);
       display: flex;
       flex-direction: column;
-      gap: 1.5vh;
+      gap: 1.2vh;
     }
 
     .hours-title {
-      font-size: 1.5vw;
+      font-size: min(1.5vw, 2.2vh);
       color: #bbb;
       letter-spacing: 0.3em;
       text-align: center;
@@ -129,13 +129,13 @@
     }
 
     .hours-label {
-      font-size: 2.4vw;
+      font-size: min(2.4vw, 4vh);
       color: #aaa;
       letter-spacing: 0.1em;
     }
 
     .hours-time {
-      font-size: 3.6vw;
+      font-size: min(3.6vw, 6vh);
       font-weight: 900;
       color: #333;
       letter-spacing: 0.05em;
