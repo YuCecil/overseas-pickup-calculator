@@ -8,15 +8,15 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      min-height: 100vh;
+      height: 100vh;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
       background: #f0f4f8;
-      padding: 32px 20px;
-      gap: 28px;
+      gap: 3vh;
       transition: background 0.6s;
     }
 
@@ -25,132 +25,126 @@
     body.status-closed { background: #f0f4f8; }
 
     .station-name {
-      font-size: 0.82rem;
-      letter-spacing: 4px;
-      color: #999;
-      text-transform: uppercase;
+      font-size: 2.4vw;
+      font-weight: bold;
+      letter-spacing: 0.4em;
+      color: #888;
     }
 
-    /* 時鐘卡片 */
+    /* 時鐘 */
     .clock-card {
       background: #fff;
-      border-radius: 24px;
-      padding: 36px 56px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.10);
+      border-radius: 2.5vw;
+      padding: 3vh 6vw;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.10);
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 8px;
-      min-width: 340px;
+      gap: 1.2vh;
     }
 
     .clock-time {
-      font-size: 4.8rem;
+      font-size: 18vw;
       font-weight: 900;
       color: #1a1a2e;
-      letter-spacing: -2px;
-      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.03em;
       font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
       line-height: 1;
     }
 
     .clock-date {
-      font-size: 1rem;
+      font-size: 2.8vw;
       color: #888;
-      letter-spacing: 1px;
+      letter-spacing: 0.15em;
     }
 
     /* 狀態徽章 */
     .status-badge {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 16px 40px;
-      border-radius: 50px;
-      font-size: 1.8rem;
+      gap: 1.2vw;
+      padding: 2vh 6vw;
+      border-radius: 100px;
+      font-size: 5.5vw;
       font-weight: 900;
-      letter-spacing: 3px;
-      transition: background 0.4s, color 0.4s;
+      letter-spacing: 0.2em;
+      transition: background 0.4s, color 0.4s, box-shadow 0.4s;
     }
 
     .status-badge.open {
       background: #2e7d32;
       color: #fff;
-      box-shadow: 0 6px 20px rgba(46,125,50,0.3);
+      box-shadow: 0 8px 32px rgba(46,125,50,0.35);
     }
     .status-badge.lunch {
       background: #e65100;
       color: #fff;
-      box-shadow: 0 6px 20px rgba(230,81,0,0.3);
+      box-shadow: 0 8px 32px rgba(230,81,0,0.35);
     }
     .status-badge.closed {
       background: #e0e0e0;
-      color: #999;
+      color: #aaa;
       box-shadow: none;
     }
 
     .status-dot {
-      width: 14px;
-      height: 14px;
+      width: 1.4vw;
+      height: 1.4vw;
       border-radius: 50%;
       background: currentColor;
       opacity: 0.85;
+      flex-shrink: 0;
     }
 
-    .status-dot.pulse {
-      animation: pulse 1.6s infinite;
-    }
+    .status-dot.pulse { animation: pulse 1.6s infinite; }
 
     @keyframes pulse {
       0%, 100% { opacity: 0.85; transform: scale(1); }
-      50%       { opacity: 0.4;  transform: scale(0.7); }
+      50%       { opacity: 0.35; transform: scale(0.65); }
     }
 
-    /* 服務時間表 */
+    /* 服務時間 */
     .hours-card {
       background: #fff;
-      border-radius: 16px;
-      padding: 20px 40px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      border-radius: 2vw;
+      padding: 2.5vh 5vw;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.07);
       display: flex;
       flex-direction: column;
-      gap: 10px;
-      min-width: 280px;
+      gap: 1.5vh;
     }
 
     .hours-title {
-      font-size: 0.72rem;
+      font-size: 1.5vw;
       color: #bbb;
-      letter-spacing: 3px;
+      letter-spacing: 0.3em;
       text-align: center;
-      margin-bottom: 2px;
     }
 
     .hours-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 24px;
+      gap: 4vw;
     }
 
     .hours-label {
-      font-size: 0.85rem;
+      font-size: 2.4vw;
       color: #aaa;
-      letter-spacing: 1px;
-      white-space: nowrap;
+      letter-spacing: 0.1em;
     }
 
     .hours-time {
-      font-size: 1.1rem;
+      font-size: 3.6vw;
       font-weight: 900;
       color: #333;
-      letter-spacing: 1px;
+      letter-spacing: 0.05em;
       font-family: ui-monospace, 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
     }
 
     .hours-divider {
       height: 1px;
-      background: #f2f2f2;
+      background: #f0f0f0;
     }
   </style>
 </head>
@@ -203,9 +197,9 @@
     const isWeekday = t.day >= 1 && t.day <= 5;
     if (!isWeekday) return 'closed';
     const mins = t.hours * 60 + t.minutes;
-    if (mins >= 8*60+30 && mins < 12*60)   return 'open';
-    if (mins >= 12*60  && mins < 13*60+30) return 'lunch';
-    if (mins >= 13*60+30 && mins < 17*60)  return 'open';
+    if (mins >= 8*60+30 && mins < 12*60)    return 'open';
+    if (mins >= 12*60   && mins < 13*60+30) return 'lunch';
+    if (mins >= 13*60+30 && mins < 17*60)   return 'open';
     return 'closed';
   }
 
@@ -215,7 +209,7 @@
     document.getElementById('clock-time').textContent =
       `${pad(t.hours)}:${pad(t.minutes)}:${pad(t.seconds)}`;
     document.getElementById('clock-date').textContent =
-      `${t.year}年${t.month}月${t.date}日　${WEEKDAYS[t.day]}`;
+      `${t.year} 年 ${t.month} 月 ${t.date} 日　${WEEKDAYS[t.day]}`;
 
     const status = getStatus(t);
     const badge  = document.getElementById('status-badge');
