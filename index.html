@@ -7,6 +7,8 @@
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
+    html { font-size: 18px; }
+
     body {
       min-height: 100vh;
       background: #f0f4f8;
@@ -14,13 +16,22 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      padding: 28px 20px;
+      justify-content: flex-start;
+      padding: 24px 20px;
       gap: 0;
     }
 
+    /* ── 版面 ── */
+    .page-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      width: 100%;
+      max-width: 920px;
+    }
+
     h1 {
-      font-size: 1.4rem;
+      font-size: 1.6rem;
       color: #555;
       margin-bottom: 20px;
       letter-spacing: 2px;
@@ -30,20 +41,19 @@
     .date-picker-wrap {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 14px;
       background: #fff;
       border-radius: 14px;
-      padding: 14px 22px;
+      padding: 16px 24px;
       box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-      margin-bottom: 28px;
       flex-wrap: wrap;
       justify-content: center;
     }
 
-    .date-picker-wrap label { font-size: 1rem; color: #555; white-space: nowrap; }
+    .date-picker-wrap label { font-size: 1.1rem; color: #555; white-space: nowrap; }
 
-    #date-input {
-      font-size: 1rem;
+    .date-text {
+      font-size: 1.1rem;
       font-family: inherit;
       border: 2px solid #d0d8e4;
       border-radius: 8px;
@@ -53,16 +63,16 @@
       outline: none;
       transition: border-color 0.2s;
     }
-    #date-input:focus { border-color: #1e88e5; }
+    .date-text:focus { border-color: #1e88e5; }
 
     #reset-btn {
-      font-size: 0.88rem;
+      font-size: 0.95rem;
       font-family: inherit;
       background: #e8f0fe;
       color: #1565c0;
       border: none;
       border-radius: 8px;
-      padding: 7px 14px;
+      padding: 8px 16px;
       cursor: pointer;
       white-space: nowrap;
       transition: background 0.2s;
@@ -78,66 +88,64 @@
       border: 1px solid #ffc107;
       border-radius: 8px;
       padding: 6px 14px;
-      font-size: 0.88rem;
+      font-size: 0.95rem;
       white-space: nowrap;
     }
 
     /* ── 主卡片 ── */
-    .cards {
-      display: flex;
-      justify-content: center;
-      width: 100%;
-      max-width: 1000px;
-    }
-
     .card {
       width: 100%;
-      max-width: 380px;
       border-radius: 20px;
-      padding: 30px 36px 34px;
+      padding: 32px 44px;
       display: flex;
-      flex-direction: column;
       align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
       box-shadow: 0 8px 32px rgba(0,0,0,0.10);
     }
 
     .card.blue  { background: linear-gradient(145deg, #1565c0, #1e88e5); color: #fff; }
 
-    .card-title   { font-size: 1.5rem; font-weight: bold; letter-spacing: 3px; margin-bottom: 6px; opacity: .95; }
-    .card-days    { font-size: 0.9rem; opacity: .8; margin-bottom: 18px; letter-spacing: 1px; }
-    .card-date    { font-size: 3.8rem; font-weight: 900; line-height: 1; margin-bottom: 6px; letter-spacing: -1px; }
-    .card-weekday { font-size: 1.5rem; font-weight: 600; opacity: .9; }
+    .card-info    { display: flex; flex-direction: column; gap: 6px; }
+    .card-title   { font-size: 1.5rem; font-weight: bold; letter-spacing: 2px; opacity: .95; }
+    .card-days    { font-size: 0.95rem; opacity: .78; letter-spacing: 1px; }
+
+    .card-result  { display: flex; align-items: baseline; gap: 12px; }
+    .card-date    { font-size: 3.2rem; font-weight: 900; line-height: 1; letter-spacing: -1px; }
+    .card-weekday { font-size: 1.35rem; font-weight: 600; opacity: .9; }
 
     .days-remaining {
-      margin-top: 16px;
       background: rgba(255,255,255,0.2);
       border-radius: 30px;
-      padding: 6px 18px;
-      font-size: 0.9rem;
+      padding: 7px 20px;
+      font-size: 0.95rem;
       letter-spacing: 1px;
+      white-space: nowrap;
     }
 
-    /* ── 附屬資訊列 ── */
+    @media (max-width: 560px) {
+      .card { flex-direction: column; text-align: center; }
+    }
+
+    /* ── 附屬資訊 ── */
     .info-bar {
       display: flex;
-      gap: 28px;
-      width: 100%;
-      max-width: 1000px;
-      margin-top: 20px;
+      gap: 20px;
       flex-wrap: wrap;
     }
 
     .info-box {
       flex: 1;
-      min-width: 280px;
+      min-width: 300px;
       background: #fff;
       border-radius: 14px;
-      padding: 20px 26px;
+      padding: 22px 28px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
     }
 
     .info-box-label {
-      font-size: 0.72rem;
+      font-size: 0.8rem;
       color: #bbb;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -148,34 +156,34 @@
     .contact-row {
       display: flex;
       align-items: center;
-      padding: 9px 0;
+      padding: 10px 0;
       border-bottom: 1px solid #f2f2f2;
     }
     .contact-row:last-child { border-bottom: none; }
 
     .contact-label {
       flex: 1;
-      font-size: 0.92rem;
+      font-size: 1rem;
       color: #444;
       font-weight: bold;
     }
     .contact-label em {
       font-style: normal;
-      font-size: 0.76rem;
+      font-size: 0.82rem;
       color: #bbb;
       font-weight: normal;
       margin-right: 5px;
     }
     .contact-label small {
       font-style: normal;
-      font-size: 0.76rem;
+      font-size: 0.82rem;
       color: #bbb;
       font-weight: normal;
       margin-left: 5px;
     }
 
     .contact-phone {
-      font-size: 1rem;
+      font-size: 1.1rem;
       font-weight: bold;
       color: #1565c0;
       text-decoration: none;
@@ -186,39 +194,66 @@
     }
     .contact-label small { white-space: nowrap; }
 
-    /* 役齡條 */
-    .mil-strip {
+    /* 役齡／成年 計算機 */
+    .age-box {
       width: 100%;
-      max-width: 1000px;
-      margin-top: 12px;
       background: #fff;
       border-radius: 14px;
-      padding: 12px 26px;
+      padding: 24px 28px 10px;
       box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+
+    .age-today-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 7px 0;
+    }
+    .age-today-label { font-size: 0.9rem; color: #999; white-space: nowrap; }
+    .age-today-value { font-size: 1.1rem; font-weight: bold; color: #333; }
+
+    .age-divider {
+      border: none;
+      border-top: 1px solid #f2f2f2;
+      margin: 14px 0 4px;
+    }
+
+    .age-input-row {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
+      margin-bottom: 6px;
+      flex-wrap: wrap;
     }
-    .mil-strip-label {
-      font-size: 0.72rem;
-      color: #bbb;
-      letter-spacing: 2px;
-      white-space: nowrap;
+    .age-input-row label { font-size: 1rem; color: #555; white-space: nowrap; }
+
+    .age-result-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 15px 0;
+      border-bottom: 1px solid #f2f2f2;
     }
-    .mil-strip-years {
-      font-size: 1.4rem;
-      font-weight: 900;
-      color: #333;
-      letter-spacing: 0.5px;
-    }
-    .mil-strip-sep {
-      display: inline-block;
-      width: 1px;
-      height: 1.4em;
-      background: #e0e0e0;
-      margin: 0 20px;
+    .age-result-row:last-child { border-bottom: none; }
+
+    .age-badge {
       flex-shrink: 0;
+      min-width: 34px;
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: bold;
+      color: #fff;
+      border-radius: 20px;
+      padding: 4px 12px;
+      margin-top: 1px;
     }
+    .age-badge.yes         { background: #43a047; }
+    .age-badge.no           { background: #f4511e; }
+    .age-badge.placeholder { background: #ccc; }
+
+    .age-result-title  { font-size: 1rem; color: #444; font-weight: bold; margin-bottom: 4px; }
+    .age-result-detail { font-size: 0.92rem; color: #666; line-height: 1.6; }
     /* ── 小月曆（浮動） ── */
     .mini-cal {
       position: fixed;
@@ -323,74 +358,104 @@
 
 <h1>僑委會取件日期計算</h1>
 
-<div class="date-picker-wrap">
-  <label for="date-input">辦理日期：</label>
-  <input type="date" id="date-input">
-  <span id="input-weekday" style="font-size:1rem;color:#444;font-weight:bold;"></span>
-  <button id="reset-btn">回到今天</button>
-  <span id="nonwork-warn">⚠️ 非工作日，已自動調整至下一個工作日</span>
-</div>
+<div class="page-layout">
+  <div class="date-picker-wrap">
+    <label for="date-input">辦理日期：</label>
+    <input type="date" id="date-input" class="date-text">
+    <span id="input-weekday" style="font-size:1rem;color:#444;font-weight:bold;"></span>
+    <button id="reset-btn">回到今天</button>
+    <span id="nonwork-warn">⚠️ 非工作日，已自動調整至下一個工作日</span>
+  </div>
 
-<div class="cards">
   <div class="card blue">
-    <div class="card-title">僑居加簽</div>
-    <div class="card-days">4 個工作天</div>
-    <div class="card-date"    id="d1-date"></div>
-    <div class="card-weekday" id="d1-weekday"></div>
+    <div class="card-info">
+      <div class="card-title">僑居加簽</div>
+      <div class="card-days">4 個工作天</div>
+    </div>
+    <div class="card-result">
+      <span class="card-date"    id="d1-date"></span>
+      <span class="card-weekday" id="d1-weekday"></span>
+    </div>
     <div class="days-remaining" id="d1-remain"></div>
   </div>
-</div>
 
-<!-- 附屬資訊列 -->
-<div class="info-bar">
-  <div class="info-box">
-    <div class="info-box-label">行政院南部聯合服務中心</div>
-    <div class="contact-row">
-      <span class="contact-label"><em>三樓</em>外交部</span>
-      <a href="tel:0777156600" class="contact-phone">07-715-6600</a>
+  <!-- 附屬資訊 -->
+  <div class="info-bar">
+    <div class="info-box">
+      <div class="info-box-label">行政院南部聯合服務中心</div>
+      <div class="contact-row">
+        <span class="contact-label"><em>三樓</em>外交部</span>
+        <a href="tel:0777156600" class="contact-phone">07-715-6600</a>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label"><em>五樓</em>移民署</span>
+        <a href="tel:0777151660" class="contact-phone">07-715-1660</a>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label"><em>九樓</em>僑委會<small>分機 219 或 281</small></span>
+        <a href="tel:0777150300" class="contact-phone">07-715-0300</a>
+      </div>
     </div>
-    <div class="contact-row">
-      <span class="contact-label"><em>五樓</em>移民署</span>
-      <a href="tel:0777151660" class="contact-phone">07-715-1660</a>
-    </div>
-    <div class="contact-row">
-      <span class="contact-label"><em>九樓</em>僑委會<small>分機 219 或 281</small></span>
-      <a href="tel:0777150300" class="contact-phone">07-715-0300</a>
+
+    <div class="info-box">
+      <div class="info-box-label">台北僑委會</div>
+      <div class="contact-row">
+        <span class="contact-label">僑委會總機</span>
+        <a href="tel:0223272600" class="contact-phone">02-2327-2600</a>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label">證照服務</span>
+        <a href="tel:0223272929" class="contact-phone">02-2327-2929</a>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label">劉淑純<small>科員</small></span>
+        <a href="tel:0223272927" class="contact-phone">02-2327-2927</a>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label">鄭翔徽<small>科長</small></span>
+        <a href="tel:0223272928" class="contact-phone">02-2327-2928</a>
+      </div>
+      <div class="contact-row">
+        <span class="contact-label">連繡心<small>科員</small></span>
+        <a href="tel:0223272916" class="contact-phone">02-2327-2916</a>
+      </div>
     </div>
   </div>
 
-  <div class="info-box">
-    <div class="info-box-label">台北僑委會證照科</div>
-    <div class="contact-row">
-      <span class="contact-label">僑委會總機</span>
-      <a href="tel:0223272600" class="contact-phone">02-2327-2600</a>
-    </div>
-    <div class="contact-row">
-      <span class="contact-label">證照服務</span>
-      <a href="tel:0223272929" class="contact-phone">02-2327-2929</a>
-    </div>
-    <div class="contact-row">
-      <span class="contact-label">劉淑純<small>科員</small></span>
-      <a href="tel:0223272927" class="contact-phone">02-2327-2927</a>
-    </div>
-    <div class="contact-row">
-      <span class="contact-label">鄭翔徽<small>科長</small></span>
-      <a href="tel:0223272928" class="contact-phone">02-2327-2928</a>
-    </div>
-    <div class="contact-row">
-      <span class="contact-label">連繡心<small>科員</small></span>
-      <a href="tel:0223272916" class="contact-phone">02-2327-2916</a>
-    </div>
-  </div>
-</div>
+  <!-- 役齡／成年 計算機 -->
+    <div class="age-box">
+      <div class="info-box-label">役齡／民法成年 對照</div>
+      <div class="age-today-row">
+        <span class="age-today-label">今年度役齡男子出生年份</span>
+        <span class="age-today-value" id="mil-active"></span>
+      </div>
+      <div class="age-today-row">
+        <span class="age-today-label">今日18歲成年門檻</span>
+        <span class="age-today-value" id="mil-adult"></span>
+      </div>
 
-<!-- 役齡條 -->
-<div class="mil-strip">
-  <span class="mil-strip-label">役齡男子</span>
-  <span class="mil-strip-years" id="mil-active"></span>
-  <span class="mil-strip-sep"></span>
-  <span class="mil-strip-label">18歲成年門檻</span>
-  <span class="mil-strip-years" id="mil-adult"></span>
+      <hr class="age-divider">
+
+      <div class="info-box-label">輸入生日查詢個人狀態</div>
+      <div class="age-input-row">
+        <label for="bday-input">出生年月日：</label>
+        <input type="date" id="bday-input" class="date-text">
+      </div>
+      <div class="age-result-row">
+        <span class="age-badge placeholder" id="role-badge">－</span>
+        <div class="age-result-text">
+          <div class="age-result-title">役齡男子（19～36歲）</div>
+          <div class="age-result-detail" id="role-detail">請先輸入出生年月日</div>
+        </div>
+      </div>
+      <div class="age-result-row">
+        <span class="age-badge placeholder" id="adult-badge">－</span>
+        <div class="age-result-text">
+          <div class="age-result-title">民法成年（18歲）</div>
+          <div class="age-result-detail" id="adult-detail">請先輸入出生年月日</div>
+        </div>
+      </div>
+    </div>
 </div>
 
 <!-- 小月曆 -->
@@ -568,7 +633,7 @@
     document.addEventListener('mouseup', () => { resizing = false; });
   })();
 
-  // 役齡 + 成年門檻
+  // 今日役齡／成年 對照
   (function() {
     const todayStr = getTaiwanToday();
     const [ty, tm, td] = todayStr.split('-').map(Number);
@@ -576,6 +641,47 @@
     const cutoff = new Date(Date.UTC(ty - 18, tm - 1, td));
     const cy = cutoff.getUTCFullYear(), cm = cutoff.getUTCMonth() + 1, cd = cutoff.getUTCDate();
     document.getElementById('mil-adult').textContent = `${cy}年${cm}月${cd}日（含）以前出生`;
+  })();
+
+  // 役齡／民法成年 計算機
+  (function() {
+    const bdayInput   = document.getElementById('bday-input');
+    const roleBadge   = document.getElementById('role-badge');
+    const roleDetail  = document.getElementById('role-detail');
+    const adultBadge  = document.getElementById('adult-badge');
+    const adultDetail = document.getElementById('adult-detail');
+
+    function update() {
+      if (!bdayInput.value) return;
+      const [by, bm, bd] = bdayInput.value.split('-').map(Number);
+      const todayStr = getTaiwanToday();
+      const [ty, tm, td] = todayStr.split('-').map(Number);
+      const todayUTC = Date.UTC(ty, tm - 1, td);
+
+      // 民法成年：滿18歲之當日起算
+      const adultUTC = Date.UTC(by + 18, bm - 1, bd);
+      const isAdult  = todayUTC >= adultUTC;
+      adultBadge.textContent = isAdult ? '是' : '否';
+      adultBadge.className   = 'age-badge ' + (isAdult ? 'yes' : 'no');
+      adultDetail.textContent = isAdult
+        ? `已於 ${by+18}年${bm}月${bd}日 起成年`
+        : `尚未成年，將於 ${by+18}年${bm}月${bd}日 起成年`;
+
+      // 役齡：年滿19歲之當年1月1日起，至年滿36歲之當年12月31日止
+      const roleStartYear = by + 19, roleEndYear = by + 36;
+      const isRoleAge = ty >= roleStartYear && ty <= roleEndYear;
+      roleBadge.textContent = isRoleAge ? '是' : '否';
+      roleBadge.className   = 'age-badge ' + (isRoleAge ? 'yes' : 'no');
+      if (isRoleAge) {
+        roleDetail.textContent = `現為役齡男子（至 ${roleEndYear}年12月31日 止）`;
+      } else if (ty < roleStartYear) {
+        roleDetail.textContent = `尚未進入役齡，將於 ${roleStartYear}年1月1日 起為役齡男子（至 ${roleEndYear}年12月31日 止）`;
+      } else {
+        roleDetail.textContent = `已超過役齡（役齡期間為 ${roleStartYear}年1月1日 至 ${roleEndYear}年12月31日）`;
+      }
+    }
+
+    bdayInput.addEventListener('change', update);
   })();
 </script>
 </body>
