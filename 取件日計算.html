@@ -361,7 +361,7 @@
 <div class="page-layout">
   <div class="date-picker-wrap">
     <label for="date-input">辦理日期：</label>
-    <input type="date" id="date-input" class="date-text">
+    <input type="date" id="date-input" class="date-text" min="1900-01-01" max="2099-12-31">
     <span id="input-weekday" style="font-size:1rem;color:#444;font-weight:bold;"></span>
     <button id="reset-btn">回到今天</button>
     <span id="nonwork-warn">⚠️ 非工作日，已自動調整至下一個工作日</span>
@@ -439,7 +439,7 @@
       <div class="info-box-label">輸入生日查詢個人狀態</div>
       <div class="age-input-row">
         <label for="bday-input">出生年月日：</label>
-        <input type="date" id="bday-input" class="date-text">
+        <input type="date" id="bday-input" class="date-text" min="1900-01-01" max="2099-12-31">
       </div>
       <div class="age-result-row">
         <span class="age-badge placeholder" id="role-badge">－</span>
