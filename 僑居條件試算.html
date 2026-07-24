@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>僑居條件試算工具</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { font-size: 18px; }
+  body {
+    min-height: 100vh;
+    background: #f0f4f8;
+    font-family: "Microsoft JhengHei", "蘋方-繁", "PingFang TC", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px 60px;
+  }
+  .page-layout { display: flex; flex-direction: column; gap: 20px; width: 100%; max-width: 980px; }
+
+  .topnav { display:flex; align-items:center; justify-content:space-between; width:100%; }
+  h1 { font-size: 1.6rem; color: #555; letter-spacing: 2px; }
+  .nav-link {
+    font-size: 0.95rem; color:#1565c0; text-decoration:none; background:#e8f0fe;
+    padding:8px 16px; border-radius:8px; white-space:nowrap;
+  }
+  .nav-link:hover { background:#c5d8fb; }
+
+  .card { background:#fff; border-radius:16px; padding:24px 28px; box-shadow:0 2px 10px rgba(0,0,0,0.08); }
+  .card-label { font-size:0.8rem; color:#bbb; letter-spacing:2px; text-transform:uppercase; margin-bottom:12px; }
+
+  label { font-size:0.95rem; color:#555; }
+  input[type=text], input[type=date], textarea, select {
+    font-family: inherit; font-size: 0.95rem; border: 2px solid #d0d8e4; border-radius: 8px;
+    padding: 7px 10px; color:#333; outline:none; transition:border-color .2s;
+  }
+  input[type=text]:focus, input[type=date]:focus, textarea:focus, select:focus { border-color:#1e88e5; }
+
+  .field-row { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+  .field-row label { min-width: 12em; white-space: nowrap; }
+  .checkbox-row { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .hint { font-size:0.8rem; color:#999; margin-top:2px; }
+
+  .btn {
+    font-family: inherit; font-size:0.95rem; border:none; border-radius:8px; padding:9px 18px;
+    cursor:pointer; transition:background .2s; white-space:nowrap;
+  }
+  .btn-primary { background:#1565c0; color:#fff; }
+  .btn-primary:hover { background:#0d47a1; }
+  .btn-light { background:#e8f0fe; color:#1565c0; }
+  .btn-light:hover { background:#c5d8fb; }
+  .btn-danger { background:#fdecea; color:#c62828; }
+  .btn-danger:hover { background:#f8c9c4; }
+  .btn-sm { padding:5px 10px; font-size:0.82rem; }
+
+  .input-tabs { display:flex; gap:8px; margin-bottom:14px; }
+  .tab-btn { padding:8px 16px; border-radius:8px 8px 0 0; background:#eef2f7; color:#777; cursor:pointer; font-size:0.92rem; }
+  .tab-btn.active { background:#1565c0; color:#fff; }
+  .tab-panel { display:none; }
+  .tab-panel.active { display:block; }
+
+  textarea#paste-area { width:100%; height:110px; resize:vertical; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size:0.85rem; }
+
+  table.trip-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:0.88rem; }
+  table.trip-table th, table.trip-table td { border-bottom:1px solid #eee; padding:6px 6px; text-align:center; }
+  table.trip-table th { color:#888; font-weight:normal; font-size:0.8rem; }
+  table.trip-table input[type=text] { width:100%; min-width:80px; padding:4px 6px; font-size:0.85rem; }
+  .trip-days-cell { color:#1565c0; font-weight:bold; }
+
+  .badge { display:inline-flex; align-items:center; justify-content:center; padding:4px 14px; border-radius:20px; font-size:0.88rem; font-weight:bold; color:#fff; white-space:nowrap; }
+  .badge.pass { background:#43a047; }
+  .badge.fail { background:#f4511e; }
+  .badge.unknown { background:#9e9e9e; }
+
+  .result-header { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .result-title { font-size:1.15rem; font-weight:bold; color:#333; }
+  .result-big { font-size:2.2rem; font-weight:900; color:#1565c0; }
+  .result-sub { font-size:0.88rem; color:#888; margin-top:2px; }
+  .result-detail { font-size:0.9rem; color:#555; line-height:1.7; margin-top:8px; }
+
+  /* 結論卡片：刻意與①②③的檢核卡片做視覺區隔，讓它一眼看出是「總結」而非另一個檢核項目 */
+  .conclusion-card { border-left-width:8px; border-left-style:solid; border-color:#ccc; background:#fafafa; }
+  .conclusion-card.pass { border-color:#43a047; background:#f2f9f2; }
+  .conclusion-card.fail { border-color:#f4511e; background:#fef5f3; }
+  .conclusion-card.unknown { border-color:#9e9e9e; background:#f7f7f7; }
+  .conclusion-eyebrow { font-size:0.8rem; color:#999; letter-spacing:2px; text-transform:uppercase; margin-bottom:6px; }
+  .conclusion-verdict { font-size:1.6rem; font-weight:900; margin-bottom:10px; }
+  .conclusion-verdict.pass { color:#2e7d32; }
+  .conclusion-verdict.fail { color:#d84315; }
+  .conclusion-verdict.unknown { color:#757575; }
+
+  .progress-bar { width:100%; height:10px; border-radius:6px; background:#eef2f7; overflow:hidden; margin:10px 0; }
+  .progress-fill { height:100%; background:linear-gradient(90deg,#1e88e5,#1565c0); border-radius:6px; }
+
+  .year-grid { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+  .year-chip { flex:1; min-width:130px; background:#f7f9fc; border-radius:10px; padding:12px 14px; text-align:center; }
+  .year-chip .yc-year { font-size:0.82rem; color:#999; }
+  .year-chip .yc-days { font-size:1.3rem; font-weight:bold; color:#333; margin:4px 0; }
+  .year-chip.pass { background:#e8f5e9; }
+  .year-chip.pass .yc-days { color:#2e7d32; }
+  .year-chip.fail { background:#fdecea; }
+  .year-chip.fail .yc-days { color:#c62828; }
+
+  .note-box { background:#fff8e1; border:1px solid #ffe082; border-radius:10px; padding:12px 16px; font-size:0.86rem; color:#7a5c00; margin-top:12px; line-height:1.7; }
+  .note-box ul { margin: 4px 0 0 1.2em; }
+
+  details.audit { margin-top:6px; }
+  details.audit summary { cursor:pointer; color:#1565c0; font-size:0.9rem; padding:6px 0; }
+  table.audit-table { width:100%; border-collapse:collapse; font-size:0.82rem; margin-top:8px; }
+  table.audit-table th, table.audit-table td { border-bottom:1px solid #f0f0f0; padding:5px 6px; text-align:center; }
+  table.audit-table th { color:#999; font-weight:normal; }
+  .tag { display:inline-block; padding:1px 8px; border-radius:10px; font-size:0.75rem; }
+  .tag.in { background:#e8f5e9; color:#2e7d32; }
+  .tag.out { background:#f2f2f2; color:#aaa; }
+  .c-counted-tag, .c-home-tag { padding:3px 12px; font-weight:bold; transition:opacity .15s; }
+  .c-counted-tag:hover, .c-home-tag:hover { opacity:0.7; }
+
+  #results-wrap { display:none; }
+  .disclaimer { font-size:0.78rem; color:#aaa; line-height:1.7; margin-top:6px; }
+</style>
+</head>
+<body>
+
+<div class="page-layout">
+  <div class="topnav">
+    <h1>僑居條件試算工具</h1>
+    <a class="nav-link" href="取件日計算.html">← 回取件日計算</a>
+  </div>
+
+  <!-- 基本資料 -->
+  <div class="card">
+    <div class="card-label">基本資料</div>
+    <div class="field-row">
+      <label for="f-name">姓名（選填）</label>
+      <input type="text" id="f-name" placeholder="王小明">
+    </div>
+    <div class="field-row">
+      <label for="f-birth">出生日期</label>
+      <input type="date" id="f-birth" min="1900-01-01" max="2099-12-31">
+    </div>
+    <div class="field-row">
+      <label for="f-query">查詢／申請基準日</label>
+      <input type="date" id="f-query" min="1900-01-01" max="2099-12-31">
+    </div>
+    <div class="field-row">
+      <label for="f-homecountry">僑居地（國家）</label>
+      <input type="text" id="f-homecountry" placeholder="例如：加拿大">
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="f-ismale" checked>
+      <label for="f-ismale">在臺（曾）設有戶籍，且尚未履行兵役義務之接近役齡或役齡男子</label>
+    </div>
+    <div class="field-row" id="permit-row" style="display:flex;">
+      <label for="f-permit">居留權／居留資格成立且連續4年日期</label>
+      <input type="date" id="f-permit" min="1900-01-01" max="2099-12-31">
+    </div>
+  </div>
+
+  <!-- 出入境行程輸入 -->
+  <div class="card">
+    <div class="card-label">出入境行程（僑居國外時間累計統計表 上半部）</div>
+    <div class="input-tabs">
+      <div class="tab-btn active" data-tab="upload">上傳 Excel 檔</div>
+      <div class="tab-btn" data-tab="paste">貼上表格</div>
+    </div>
+    <div class="tab-panel active" id="tab-upload">
+      <input type="file" id="file-input" accept=".xlsx,.xls">
+    </div>
+    <div class="tab-panel" id="tab-paste">
+      <textarea id="paste-area" placeholder="出境日期  出境港口  入境日期  入境港口  居住國外天數
+2024/07/31&#9;菲律賓&#9;2024/12/09&#9;多倫多&#9;132"></textarea>
+      <div style="margin-top:8px;"><button class="btn btn-light" id="parse-paste-btn">解析貼上內容</button></div>
+    </div>
+
+    <table class="trip-table" id="trip-table">
+      <thead>
+        <tr>
+          <th style="width:12%">出境日期</th>
+          <th style="width:12%">出境港口</th>
+          <th style="width:12%">入境日期</th>
+          <th style="width:12%">入境港口</th>
+          <th style="width:10%">計入境外天數</th>
+          <th style="width:10%">是否為僑居地</th>
+          <th style="width:8%">天數</th>
+          <th style="width:8%"></th>
+        </tr>
+      </thead>
+      <tbody id="trip-tbody"></tbody>
+    </table>
+    <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+      <button class="btn btn-light btn-sm" id="add-row-btn">＋ 新增一列</button>
+      <button class="btn btn-light btn-sm" id="clear-rows-btn">清空所有列</button>
+    </div>
+
+    <div id="status-banner" style="display:none; margin-top:14px; padding:10px 16px; border-radius:8px; font-size:0.88rem;"></div>
+
+    <div style="margin-top:16px;">
+      <button class="btn btn-primary" id="calc-btn">開始試算</button>
+    </div>
+  </div>
+
+  <!-- 結果 -->
+  <div id="results-wrap" class="page-layout" style="gap:20px;">
+
+    <div class="card">
+      <div class="result-header">
+        <div class="result-title">① 在國外累計居住天數（滿4年＝1460日）</div>
+        <span class="badge" id="badge-1460">－</span>
+      </div>
+      <div class="result-big" id="big-1460">0 <span style="font-size:1rem;color:#999;">日</span></div>
+      <div class="progress-bar"><div class="progress-fill" id="bar-1460" style="width:0%"></div></div>
+      <div class="result-sub" id="sub-1460"></div>
+    </div>
+
+    <div class="card">
+      <div class="result-header">
+        <div class="result-title">② 僑居地居留天數</div>
+        <span class="badge" id="badge-residency">－</span>
+      </div>
+      <div class="hint" style="margin-bottom:12px;">符合任一種即可</div>
+
+      <div style="display:flex; gap:16px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:280px; background:#f7f9fc; border-radius:12px; padding:16px 18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <b style="color:#333;">方式A：連續居住滿6個月</b>
+            <span class="badge" id="badge-6mo">－</span>
+          </div>
+          <div class="result-detail" id="detail-6mo" style="margin-top:0;"></div>
+        </div>
+
+        <div style="flex:1; min-width:280px; background:#f7f9fc; border-radius:12px; padding:16px 18px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <b style="color:#333;">方式B：最近兩年每年8個月（240日）以上</b>
+            <span class="badge" id="badge-240">－</span>
+          </div>
+          <div class="result-detail" id="detail-240" style="margin-top:0;"></div>
+          <div class="year-grid" id="roll-window-grid" style="margin-top:10px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" id="card-role" style="display:none;">
+      <div class="result-header">
+        <div class="result-title">③ 接近役齡期間（16、17、18歲之年）在臺天數（每年不得逾183日）</div>
+      </div>
+      <div class="year-grid" id="near-age-grid"></div>
+    </div>
+
+    <div class="card conclusion-card" id="card-path" style="display:none;">
+      <div class="conclusion-eyebrow">結論</div>
+      <div class="conclusion-verdict" id="conclusion-verdict">－</div>
+      <div class="result-detail" id="detail-path"></div>
+      <div class="note-box" id="notes-path" style="display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-label">逐筆試算明細（稽核用）</div>
+      <details class="audit">
+        <summary>展開查看每筆出入境紀錄的計算依據</summary>
+        <table class="audit-table" id="audit-table">
+          <thead><tr><th>出境</th><th>港口</th><th>入境</th><th>港口</th><th>計入境外天數</th><th>是否為僑居地</th><th>天數</th></tr></thead>
+          <tbody id="audit-tbody"></tbody>
+        </table>
+      </details>
+      <div class="disclaimer">僅供快速篩檢，永久居留權／居留資格文件仍須人工覆核。</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ============ 計算引擎（與 engine.js 相同邏輯） ============ */
+function parseYMD(s) {
+  if (!s) return null;
+  const m = String(s).trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (!m) return null;
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+}
+function fmtYMD(d) {
+  if (!d) return '';
+  return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+function addDays(d, n) { const r = new Date(d); r.setUTCDate(r.getUTCDate() + n); return r; }
+function addMonths(d, n) { const r = new Date(d); r.setUTCMonth(r.getUTCMonth() + n); return r; }
+function diffDaysInclusive(start, end) { return Math.round((end - start) / 86400000) + 1; }
+function cmp(a, b) { return a - b; }
+
+const EXCLUDE_KEYWORDS = [
+  '中國大陸', '大陸', '香港', '澳門',
+  '北京', '上海', '天津', '重慶', '廣州', '深圳', '廈門', '福州', '杭州', '南京',
+  '武漢', '成都', '西安', '昆明', '長沙', '青島', '大連', '瀋陽', '哈爾濱', '鄭州',
+  '濟南', '南昌', '合肥', '太原', '石家莊', '南寧', '貴陽', '蘭州', '銀川', '西寧',
+  '呼和浩特', '烏魯木齊', '拉薩', '海口', '汕頭', '溫州', '寧波', '無錫', '蘇州',
+  '珠海', '東莞', '佛山', '泉州', '桂林', '三亞', '汕尾', '惠州', '中山', '江門',
+  '常州', '徐州', '揚州', '南通',
+];
+function suggestExcluded(port) {
+  if (!port) return false;
+  const p = String(port).trim();
+  return EXCLUDE_KEYWORDS.some(k => p.includes(k));
+}
+
+// 城市／地名 → 國家 對照表（常見僑居國目的地，供自動判斷「是否為僑居地」使用）
+// 值一律使用常見中文國名；比對僑居國輸入時會經過 normalizeCountry() 處理同義詞。
+const PLACE_TO_COUNTRY = {
+  // 美國
+  '美國':'美國','洛杉磯':'美國','紐約':'美國','舊金山':'美國','三藩市':'美國','芝加哥':'美國','休士頓':'美國',
+  '西雅圖':'美國','波士頓':'美國','亞特蘭大':'美國','達拉斯':'美國','拉斯維加斯':'美國','聖地牙哥':'美國',
+  '鳳凰城':'美國','費城':'美國','邁阿密':'美國','奧蘭多':'美國','丹佛':'美國','底特律':'美國','聖荷西':'美國',
+  '沙加緬度':'美國','爾灣':'美國','橙縣':'美國','矽谷':'美國','關島':'美國','檀香山':'美國','夏威夷':'美國',
+  '聖蓋博':'美國','蒙特利公園':'美國','天普市':'美國','阿罕布拉':'美國','柔似蜜':'美國','亞凱迪亞':'美國',
+  '聖瑪利諾':'美國','帕薩迪納':'美國','華盛頓':'美國','波特蘭':'美國','奧斯汀':'美國','納許維爾':'美國',
+  // 加拿大
+  '加拿大':'加拿大','多倫多':'加拿大','溫哥華':'加拿大','滿地可':'加拿大','蒙特婁':'加拿大','渥太華':'加拿大',
+  '卡加利':'加拿大','愛民頓':'加拿大','列治文':'加拿大','本拿比':'加拿大','素里':'加拿大','萬錦市':'加拿大',
+  '密西沙加':'加拿大','滑鐵盧':'加拿大','魁北克市':'加拿大','溫尼伯':'加拿大',
+  // 日本
+  '日本':'日本','東京':'日本','大阪':'日本','京都':'日本','橫濱':'日本','名古屋':'日本','福岡':'日本',
+  '札幌':'日本','神戶':'日本','埼玉':'日本','千葉':'日本','仙台':'日本','廣島':'日本','沖繩':'日本','琉球':'日本',
+  // 韓國
+  '韓國':'韓國','南韓':'韓國','首爾':'韓國','釜山':'韓國','仁川':'韓國','大邱':'韓國','大田':'韓國',
+  '光州':'韓國','濟州':'韓國','漢城':'韓國',
+  // 英國
+  '英國':'英國','倫敦':'英國','曼徹斯特':'英國','伯明罕':'英國','利物浦':'英國','愛丁堡':'英國',
+  '格拉斯哥':'英國','劍橋':'英國','牛津':'英國',
+  // 澳大利亞／紐西蘭
+  '澳大利亞':'澳大利亞','澳洲':'澳大利亞','雪梨':'澳大利亞','悉尼':'澳大利亞','墨爾本':'澳大利亞',
+  '布里斯本':'澳大利亞','伯斯':'澳大利亞','阿德萊德':'澳大利亞','坎培拉':'澳大利亞','黃金海岸':'澳大利亞',
+  '紐西蘭':'紐西蘭','奧克蘭':'紐西蘭','威靈頓':'紐西蘭','基督城':'紐西蘭',
+  // 新加坡
+  '新加坡':'新加坡',
+  // 馬來西亞
+  '馬來西亞':'馬來西亞','吉隆坡':'馬來西亞','檳城':'馬來西亞','新山':'馬來西亞','怡保':'馬來西亞',
+  '馬六甲':'馬來西亞','沙巴':'馬來西亞','古晉':'馬來西亞','亞庇':'馬來西亞','詩巫':'馬來西亞',
+  // 泰國
+  '泰國':'泰國','曼谷':'泰國','清邁':'泰國','普吉':'泰國','芭達雅':'泰國','清萊':'泰國',
+  // 菲律賓
+  '菲律賓':'菲律賓','馬尼拉':'菲律賓','宿霧':'菲律賓','達沃':'菲律賓','長灘島':'菲律賓',
+  // 越南
+  '越南':'越南','河內':'越南','胡志明市':'越南','西貢':'越南','峴港':'越南',
+  // 印尼
+  '印尼':'印尼','印度尼西亞':'印尼','雅加達':'印尼','泗水':'印尼','峇里島':'印尼','巴里島':'印尼','萬隆':'印尼',
+  // 印度
+  '印度':'印度','新德里':'印度','孟買':'印度','班加羅爾':'印度','加爾各答':'印度','清奈':'印度',
+  // 柬埔寨／寮國／緬甸／汶萊／孟加拉／蒙古／東帝汶
+  '柬埔寨':'柬埔寨','金邊':'柬埔寨','暹粒':'柬埔寨',
+  '寮國':'寮國','永珍':'寮國','萬象':'寮國',
+  '緬甸':'緬甸','仰光':'緬甸','內比都':'緬甸',
+  '汶萊':'汶萊','斯里巴加灣':'汶萊',
+  '孟加拉':'孟加拉','達卡':'孟加拉',
+  '蒙古':'蒙古國','蒙古國':'蒙古國','烏蘭巴托':'蒙古國',
+  '東帝汶':'東帝汶','帝力':'東帝汶',
+  // 歐洲
+  '土耳其':'土耳其','伊斯坦堡':'土耳其','安卡拉':'土耳其',
+  '烏克蘭':'烏克蘭','基輔':'烏克蘭','敖德薩':'烏克蘭','利沃夫':'烏克蘭',
+  '匈牙利':'匈牙利','布達佩斯':'匈牙利',
+  '波蘭':'波蘭','華沙':'波蘭','克拉科夫':'波蘭',
+  '西班牙':'西班牙','馬德里':'西班牙','巴塞隆納':'西班牙','瓦倫西亞':'西班牙',
+  '德國':'德國','柏林':'德國','慕尼黑':'德國','法蘭克福':'德國','漢堡':'德國','科隆':'德國',
+  '法國':'法國','巴黎':'法國','里昂':'法國','馬賽':'法國',
+  '義大利':'義大利','羅馬':'義大利','米蘭':'義大利','佛羅倫斯':'義大利','威尼斯':'義大利','拿坡里':'義大利',
+  '荷蘭':'荷蘭','阿姆斯特丹':'荷蘭','鹿特丹':'荷蘭','海牙':'荷蘭',
+  '瑞士':'瑞士','蘇黎世':'瑞士','日內瓦':'瑞士','伯恩':'瑞士',
+  '比利時':'比利時','布魯塞爾':'比利時',
+  '奧地利':'奧地利','維也納':'奧地利',
+  '愛爾蘭':'愛爾蘭','都柏林':'愛爾蘭',
+  '瑞典':'瑞典','斯德哥爾摩':'瑞典',
+  '丹麥':'丹麥','哥本哈根':'丹麥',
+  '挪威':'挪威','奧斯陸':'挪威',
+  '希臘':'希臘','雅典':'希臘',
+  '葡萄牙':'葡萄牙','里斯本':'葡萄牙',
+  '捷克':'捷克','布拉格':'捷克',
+  // 其他
+  '南非':'南非','約翰尼斯堡':'南非','開普敦':'南非','普利托利亞':'南非',
+  '巴西':'巴西','聖保羅':'巴西','里約熱內盧':'巴西',
+  '阿根廷':'阿根廷','布宜諾斯艾利斯':'阿根廷',
+  '巴拉圭':'巴拉圭','亞松森':'巴拉圭',
+  '智利':'智利','聖地牙哥智利':'智利',
+};
+// 依鍵長由長至短排序，避免短字串（如「南韓」）先比對到而蓋過更長的專有名詞
+const PLACE_KEYS_SORTED = Object.keys(PLACE_TO_COUNTRY).sort((a, b) => b.length - a.length);
+
+function guessCountry(text) {
+  if (!text) return null;
+  const p = String(text).trim();
+  if (!p) return null;
+  if (PLACE_TO_COUNTRY[p]) return PLACE_TO_COUNTRY[p];
+  for (const key of PLACE_KEYS_SORTED) {
+    if (p.includes(key)) return PLACE_TO_COUNTRY[key];
+  }
+  return null;
+}
+
+// 僑居國欄位常見同義詞正規化，讓「韓國」「南韓」、「澳洲」「澳大利亞」等writing 視為同一國
+const COUNTRY_ALIASES = { '韓國':'韓國', '南韓':'韓國', '澳洲':'澳大利亞', '澳大利亞':'澳大利亞', '美利堅':'美國', '英格蘭':'英國' };
+function normalizeCountry(text) {
+  if (!text) return '';
+  const p = String(text).trim();
+  return COUNTRY_ALIASES[p] || p;
+}
+
+// 判斷某筆行程是否可自動認定為僑居地：出境港、入境港都必須各自比對成功，且兩者國家一致，且等於使用者填的僑居國
+function deriveIsHome(departPort, returnPort, homeCountryRaw) {
+  const homeCountry = normalizeCountry(homeCountryRaw);
+  if (!homeCountry) return false;
+  const c1 = guessCountry(departPort);
+  const c2 = guessCountry(returnPort);
+  if (!c1 || !c2) return false;
+  return normalizeCountry(c1) === homeCountry && normalizeCountry(c2) === homeCountry;
+}
+
+function calculate(trips, birthStr, queryStr) {
+  const birth = parseYMD(birthStr);
+  const query = parseYMD(queryStr);
+  const T = trips
+    .map(t => ({
+      depart: parseYMD(t.depart),
+      departPort: t.departPort || '',
+      return: t.return ? parseYMD(t.return) : null,
+      returnPort: t.returnPort || '',
+      counted: !!t.counted,
+      isHome: !!t.isHome,
+    }))
+    .filter(t => t.depart)
+    .sort((a, b) => a.depart - b.depart);
+
+  // 境外累計居住天數（1460日）：只要不是中國大陸／港澳，不限定是不是僑居地那個特定國家
+  const abroadIntervals = T.filter(t => t.counted).map(t => ({
+    start: t.depart,
+    end: t.return || query,
+    ongoing: !t.return,
+  }));
+  let totalAbroadDays = 0;
+  const abroadRows = abroadIntervals.map(iv => {
+    const days = diffDaysInclusive(iv.start, iv.end);
+    totalAbroadDays += days;
+    return { ...iv, days };
+  });
+
+  // 僑居地居留天數（方式A／方式B）：僅計入同時勾選「計入」且「僑居地」的行程
+  const homeIntervals = T.filter(t => t.counted && t.isHome).map(t => ({
+    start: t.depart,
+    end: t.return || query,
+    ongoing: !t.return,
+  }));
+  const homeRows = homeIntervals.map(iv => ({ ...iv, days: diffDaysInclusive(iv.start, iv.end) }));
+
+  const mergedBlocks = [];
+  for (const iv of homeRows) {
+    const last = mergedBlocks[mergedBlocks.length - 1];
+    if (last && iv.start <= addDays(last.end, 1)) {
+      if (iv.end > last.end) last.end = iv.end;
+      last.ongoing = last.ongoing || iv.ongoing;
+    } else {
+      mergedBlocks.push({ start: iv.start, end: iv.end, ongoing: iv.ongoing });
+    }
+  }
+
+  let longestContinuous = null;
+  let sixMonthSatisfiedDate = null;
+  for (const b of mergedBlocks) {
+    const sixMoMark = addDays(addMonths(b.start, 6), -1);
+    const days = diffDaysInclusive(b.start, b.end);
+    if (!longestContinuous || days > longestContinuous.days) longestContinuous = { start: b.start, end: b.end, days };
+    if (b.end >= sixMoMark) {
+      if (!sixMonthSatisfiedDate || sixMoMark < sixMonthSatisfiedDate) sixMonthSatisfiedDate = sixMoMark;
+    }
+  }
+  const sixMonthPass = !!sixMonthSatisfiedDate;
+
+  // 「最近兩年每年8個月(240天)」：以查詢日往前回推，每365天為一年（滾動區間，非曆年）
+  // 僅計算「僑居地」行程（homeRows），與境外總天數（abroadRows）分開
+  function sumHomeInWindow(winStart, winEnd) {
+    let total = 0;
+    for (const iv of homeRows) {
+      const s = iv.start > winStart ? iv.start : winStart;
+      const e = iv.end < winEnd ? iv.end : winEnd;
+      if (s <= e) total += diffDaysInclusive(s, e);
+    }
+    return total;
+  }
+  const rollWin1 = { start: addDays(query, -364), end: query };
+  const rollWin2 = { start: addDays(query, -729), end: addDays(query, -365) };
+  rollWin1.days = sumHomeInWindow(rollWin1.start, rollWin1.end);
+  rollWin2.days = sumHomeInWindow(rollWin2.start, rollWin2.end);
+  rollWin1.pass = rollWin1.days >= 240;
+  rollWin2.pass = rollWin2.days >= 240;
+  const twoYear240Pass = rollWin1.pass && rollWin2.pass;
+  const twoYear240SatisfiedDate = twoYear240Pass ? query : null;
+
+  // 每曆年僑居地天數，僅供逐年參考表顯示用
+  const abroadByYear = {};
+  for (const iv of homeRows) {
+    let y = iv.start.getUTCFullYear();
+    const endY = iv.end.getUTCFullYear();
+    for (; y <= endY; y++) {
+      const yStart = new Date(Date.UTC(y, 0, 1));
+      const yEnd = new Date(Date.UTC(y, 11, 31));
+      const s = iv.start > yStart ? iv.start : yStart;
+      const e = iv.end < yEnd ? iv.end : yEnd;
+      if (s <= e) abroadByYear[y] = (abroadByYear[y] || 0) + diffDaysInclusive(s, e);
+    }
+  }
+
+  const residencyPass = sixMonthPass || twoYear240Pass;
+  const residencySatisfiedDate = [sixMonthSatisfiedDate, twoYear240Pass ? twoYear240SatisfiedDate : null]
+    .filter(Boolean).sort(cmp)[0] || null;
+
+  let cum = 0;
+  let day1460Date = null;
+  for (const iv of abroadRows) {
+    const before = cum;
+    cum += iv.days;
+    if (before < 1460 && cum >= 1460) { day1460Date = addDays(iv.start, 1460 - before - 1); break; }
+  }
+  const day1460Pass = totalAbroadDays >= 1460;
+
+  const twSegmentsRaw = [];
+  if (T.length === 0) {
+    twSegmentsRaw.push({ entryReal: false, entryDate: birth, exitReal: false, exitDate: query });
+  } else {
+    if (T[0].depart.getTime() !== birth.getTime()) {
+      twSegmentsRaw.push({ entryReal: false, entryDate: birth, exitReal: true, exitDate: T[0].depart });
+    }
+    for (let i = 0; i < T.length - 1; i++) {
+      if (!T[i].return) continue;
+      twSegmentsRaw.push({ entryReal: true, entryDate: T[i].return, exitReal: true, exitDate: T[i + 1].depart });
+    }
+    const last = T[T.length - 1];
+    if (last.return) {
+      twSegmentsRaw.push({ entryReal: true, entryDate: last.return, exitReal: true, exitDate: query, exitIsCutoff: true });
+    }
+  }
+  const twSegments = twSegmentsRaw.map(s => {
+    const effStart = addDays(s.entryDate, s.entryReal ? 1 : 0);
+    const effEnd = addDays(s.exitDate, (s.exitReal || s.exitIsCutoff) ? -1 : 0);
+    return { effStart, effEnd, valid: effStart <= effEnd };
+  }).filter(s => s.valid);
+
+  const twByYear = {};
+  for (const seg of twSegments) {
+    let y = seg.effStart.getUTCFullYear();
+    const endY = seg.effEnd.getUTCFullYear();
+    for (; y <= endY; y++) {
+      const yStart = new Date(Date.UTC(y, 0, 1));
+      const yEnd = new Date(Date.UTC(y, 11, 31));
+      const s = seg.effStart > yStart ? seg.effStart : yStart;
+      const e = seg.effEnd < yEnd ? seg.effEnd : yEnd;
+      if (s <= e) twByYear[y] = (twByYear[y] || 0) + diffDaysInclusive(s, e);
+    }
+  }
+
+  const birthYear = birth.getUTCFullYear();
+  const nearAgeYears = [16, 17, 18].map(age => birthYear + age);
+  const nearAgeCheck = nearAgeYears.map(y => ({
+    year: y, age: y - birthYear, twDays: twByYear[y] || 0, pass: (twByYear[y] || 0) <= 183,
+  }));
+
+  let basicSatisfiedDate = null;
+  if (day1460Pass && residencyPass) basicSatisfiedDate = [day1460Date, residencySatisfiedDate].sort(cmp)[1];
+
+  return {
+    totalAbroadDays, day1460Pass, day1460Date, abroadRows, mergedBlocks, longestContinuous,
+    sixMonthPass, sixMonthSatisfiedDate, abroadByYear, rollWin1, rollWin2, twoYear240Pass, twoYear240SatisfiedDate,
+    residencyPass, residencySatisfiedDate, twByYear, twSegments, nearAgeCheck, basicSatisfiedDate,
+    birthYear, _T: T,
+  };
+}
+
+function buildNotReadyReasons(r) {
+  const reasons = [];
+  if (!r.day1460Pass) {
+    reasons.push(`①在國外累計居住天數未達標：目前累計 <b>${r.totalAbroadDays}</b> 日，尚差 <b>${1460 - r.totalAbroadDays}</b> 日才滿1460日（4年）。`);
+  }
+  if (!r.residencyPass) {
+    const a = r.longestContinuous
+      ? `方式A（連續6個月）最長單筆連續居住 <b>${r.longestContinuous.days}</b> 日，尚未滿6個月`
+      : '方式A（連續6個月）目前沒有任何計入境外天數的出入境紀錄';
+    const b = `方式B（最近兩年每年240日）最近一年 <b>${r.rollWin1.days}</b> 日、再前一年 <b>${r.rollWin2.days}</b> 日（兩者都要達240日才算符合）`;
+    reasons.push(`②僑居地居留天數未達標：${a}；${b}。`);
+  }
+  return reasons;
+}
+
+function evaluateRolePath(r, permitDateStr) {
+  const birthYear = r.birthYear;
+  const age15Dec31 = new Date(Date.UTC(birthYear + 15, 11, 31));
+  const age18Dec31 = new Date(Date.UTC(birthYear + 18, 11, 31));
+  const age19Jan1 = new Date(Date.UTC(birthYear + 19, 0, 1));
+  const permitDate = permitDateStr ? parseYMD(permitDateStr) : null;
+
+  if (!r.day1460Pass || !r.residencyPass) {
+    return { basicReady: false, reasons: buildNotReadyReasons(r) };
+  }
+  let finalDate = r.basicSatisfiedDate;
+  let permitPending = !permitDate;
+  if (permitDate && permitDate > finalDate) finalDate = permitDate;
+
+  const nearAgeAllPass = r.nearAgeCheck.every(y => y.pass);
+  let path, explanation;
+  let returnEventsInRoleAge = [];
+
+  if (finalDate <= age15Dec31) {
+    path = 1;
+    explanation = `他符合「在國外累計滿4年」與「僑居地居留天數」這兩項條件的日子是 <b>${fmtYMD(finalDate)}</b>，落在年滿15歲之年12月31日（${fmtYMD(age15Dec31)}）以前。因為在這麼小就已經符合，法規上不再檢查16、17、18歲每年在臺天數，也不檢查19歲以後有沒有入境紀錄，只要求：僑居地的居留資格（永久居留權或連續居留資格）到申請當時仍然持續有效、沒有中斷。`;
+  } else if (finalDate <= age18Dec31) {
+    path = 2;
+    explanation = `他符合「在國外累計滿4年」與「僑居地居留天數」這兩項條件的日子是 <b>${fmtYMD(finalDate)}</b>，落在16～18歲之間（接近役齡期間）。因為是在這個階段才符合，法規要求：16、17、18歲這三年，每年在臺天數都不能超過183天。對照上方③的結果：${nearAgeAllPass ? '<b style="color:#2e7d32">三年都沒有超過，符合</b>' : '<b style="color:#d84315">有年度超過183天，不符合</b>（除非有特殊原因，經內政部同意）'}。`;
+  } else {
+    path = 3;
+    for (const t of r._T) {
+      if (t.return && t.return >= age19Jan1 && t.return < finalDate) returnEventsInRoleAge.push({ date: fmtYMD(t.return), port: t.returnPort });
+    }
+    explanation = `他符合「在國外累計滿4年」與「僑居地居留天數」這兩項條件的日子是 <b>${fmtYMD(finalDate)}</b>，已經進入19歲以後（役齡期間）才符合。因為拖到這麼晚，法規要求兩件事都要成立：(1) 16、17、18歲這三年，每年在臺天數都不能超過183天——${nearAgeAllPass ? '<b style="color:#2e7d32">符合</b>' : '<b style="color:#d84315">不符合</b>'}；(2) 19歲之年1月1日起到符合當天為止，完全沒有入境（返臺）紀錄——${returnEventsInRoleAge.length === 0 ? '<b style="color:#2e7d32">符合</b>（無入境紀錄）' : `<b style="color:#d84315">不符合</b>（有 ${returnEventsInRoleAge.length} 筆入境紀錄：` + returnEventsInRoleAge.map(e => `${e.date}／${e.port}`).join('、') + '）'}。以上兩件事除非有特殊原因經內政部同意，否則都要符合。`;
+  }
+
+  let overallPass; let notes = [];
+  if (path === 1) {
+    overallPass = null;
+    notes.push('請人工確認：僑居地居留資格（永久居留權或連續居留資格）至「申請時」是否仍持續有效且未中斷。');
+  } else if (path === 2) {
+    overallPass = nearAgeAllPass;
+  } else {
+    overallPass = nearAgeAllPass && returnEventsInRoleAge.length === 0;
+  }
+  if (permitPending) notes.push('尚未輸入「居留權／居留資格成立且連續4年」日期，以上結論假設此條件已成立，僅供參考，請確認文件後覆核。');
+
+  return { basicReady: true, finalDate, path, explanation, nearAgeAllPass, returnEventsInRoleAge, overallPass, permitPending, notes, age15Dec31, age18Dec31, age19Jan1 };
+}
+
+/* ============ UI 綁定 ============ */
+function showStatus(msg, type) {
+  const el = document.getElementById('status-banner');
+  el.style.display = 'block';
+  el.textContent = msg;
+  el.style.background = type === 'error' ? '#fdecea' : type === 'warn' ? '#fff8e1' : '#e8f5e9';
+  el.style.color = type === 'error' ? '#c62828' : type === 'warn' ? '#7a5c00' : '#2e7d32';
+}
+
+function todayTW() {
+  const tw = new Date(Date.now() + 8 * 3600000);
+  return tw.toISOString().slice(0, 10);
+}
+document.getElementById('f-query').value = todayTW();
+
+// tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// 若已經算過一次結果，下列欄位變更時自動重新試算，不必再按一次「開始試算」
+function autoRecalcIfShown() {
+  if (document.getElementById('results-wrap').style.display !== 'none') runCalculation();
+}
+
+document.getElementById('f-ismale').addEventListener('change', e => {
+  document.getElementById('permit-row').style.display = e.target.checked ? 'flex' : 'none';
+  autoRecalcIfShown();
+});
+document.getElementById('f-birth').addEventListener('change', autoRecalcIfShown);
+document.getElementById('f-query').addEventListener('change', autoRecalcIfShown);
+document.getElementById('f-permit').addEventListener('change', autoRecalcIfShown);
+document.getElementById('f-homecountry').addEventListener('change', () => {
+  if (tbody.children.length > 0) redetectHome();
+  autoRecalcIfShown();
+});
+
+const tbody = document.getElementById('trip-tbody');
+
+function toInputDate(s) {
+  // 'YYYY/MM/DD' -> 'YYYY-MM-DD'
+  if (!s) return '';
+  const m = String(s).trim().match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (!m) return '';
+  return `${m[1]}-${String(+m[2]).padStart(2,'0')}-${String(+m[3]).padStart(2,'0')}`;
+}
+
+// 判斷是否計入：優先採用統計表原有的「居住國外天數」欄位（0＝不計入），
+// 該欄缺漏時才退回依港口關鍵字自動建議。
+function deriveCounted(row) {
+  if (row.givenDays !== undefined && row.givenDays !== null && String(row.givenDays).trim() !== '') {
+    const n = parseFloat(String(row.givenDays).replace(/[^\d.\-]/g, ''));
+    if (!isNaN(n)) return n !== 0;
+  }
+  return !suggestExcluded(row.departPort) && !suggestExcluded(row.returnPort);
+}
+
+function addTripRow(row) {
+  row = row || {};
+  const tr = document.createElement('tr');
+  const counted = row.counted !== undefined ? row.counted : deriveCounted(row);
+  // 預設「否」：只有出境港、入境港都能自動比對為使用者填寫的僑居國時，才預設勾選為僑居地
+  const homeCountry = document.getElementById('f-homecountry').value;
+  const isHome = row.isHome !== undefined ? row.isHome : (counted && deriveIsHome(row.departPort, row.returnPort, homeCountry));
+  tr.innerHTML = `
+    <td><input type="date" class="c-depart" value="${toInputDate(row.depart)||''}"></td>
+    <td><input type="text" class="c-departPort" value="${row.departPort||''}"></td>
+    <td><input type="date" class="c-return" value="${toInputDate(row.return)||''}"></td>
+    <td><input type="text" class="c-returnPort" value="${row.returnPort||''}"></td>
+    <td><span class="tag c-counted-tag ${counted?'in':'out'}" style="cursor:pointer;" data-counted="${counted}">${counted?'計入':'不計入'}</span></td>
+    <td><span class="tag c-home-tag ${isHome?'in':'out'}" style="cursor:pointer;" data-home="${isHome}">${isHome?'僑居地':'其他國家'}</span></td>
+    <td class="trip-days-cell c-days">－</td>
+    <td><button class="btn btn-danger btn-sm c-del">刪除</button></td>
+  `;
+  tbody.appendChild(tr);
+  const tag = tr.querySelector('.c-counted-tag');
+  const homeTag = tr.querySelector('.c-home-tag');
+  const departPortInput = tr.querySelector('.c-departPort');
+  const returnPortInput = tr.querySelector('.c-returnPort');
+
+  function recomputeHomeFromPorts() {
+    if (tag.dataset.counted !== 'true') { setHomeTag(homeTag, false); return; }
+    const hc = document.getElementById('f-homecountry').value;
+    setHomeTag(homeTag, deriveIsHome(departPortInput.value, returnPortInput.value, hc));
+  }
+
+  tag.addEventListener('click', () => {
+    const now = tag.dataset.counted === 'true';
+    const next = !now;
+    tag.dataset.counted = next;
+    tag.textContent = next ? '計入' : '不計入';
+    tag.className = 'tag c-counted-tag ' + (next ? 'in' : 'out');
+    // 不計入（觸及中國大陸／港澳）者，依法不可能是僑居地；重新計入時則依港口重新自動判斷
+    recomputeHomeFromPorts();
+    autoRecalcIfShown();
+  });
+  homeTag.addEventListener('click', () => {
+    if (tag.dataset.counted !== 'true') return; // 不計入者不可切換為僑居地
+    setHomeTag(homeTag, homeTag.dataset.home !== 'true');
+    autoRecalcIfShown();
+  });
+  [departPortInput, returnPortInput].forEach(inp => inp.addEventListener('change', () => { recomputeHomeFromPorts(); autoRecalcIfShown(); }));
+  tr.querySelector('.c-del').addEventListener('click', () => { tr.remove(); recalcRowDays(); autoRecalcIfShown(); });
+  [tr.querySelector('.c-depart'), tr.querySelector('.c-return')].forEach(inp => inp.addEventListener('change', () => { recalcRowDays(); autoRecalcIfShown(); }));
+  recalcRowDays();
+}
+
+function setHomeTag(homeTagEl, v) {
+  homeTagEl.dataset.home = v;
+  homeTagEl.textContent = v ? '僑居地' : '其他國家';
+  homeTagEl.className = 'tag c-home-tag ' + (v ? 'in' : 'out');
+}
+
+function redetectHome() {
+  const homeCountry = document.getElementById('f-homecountry').value;
+  let changed = 0;
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const countedTag = tr.querySelector('.c-counted-tag');
+    const homeTag = tr.querySelector('.c-home-tag');
+    const counted = countedTag.dataset.counted === 'true';
+    const departPort = tr.querySelector('.c-departPort').value;
+    const returnPort = tr.querySelector('.c-returnPort').value;
+    const next = counted && deriveIsHome(departPort, returnPort, homeCountry);
+    if ((homeTag.dataset.home === 'true') !== next) changed++;
+    setHomeTag(homeTag, next);
+  });
+  showStatus(homeCountry ? `已依僑居國「${homeCountry}」重新判斷，共更新 ${changed} 筆「是否為僑居地」標籤。` : '請先在上方填寫僑居國，才能自動判斷。', homeCountry ? undefined : 'warn');
+}
+
+function recalcRowDays() {
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const d1 = parseYMD(tr.querySelector('.c-depart').value.replaceAll('-','/'));
+    const d2raw = tr.querySelector('.c-return').value;
+    const d2 = d2raw ? parseYMD(d2raw.replaceAll('-','/')) : null;
+    const cell = tr.querySelector('.c-days');
+    if (d1 && d2) cell.textContent = diffDaysInclusive(d1, d2) + ' 日';
+    else if (d1 && !d2) cell.textContent = '進行中';
+    else cell.textContent = '－';
+  });
+}
+
+document.getElementById('add-row-btn').addEventListener('click', () => addTripRow());
+document.getElementById('clear-rows-btn').addEventListener('click', () => { tbody.innerHTML = ''; showStatus('已清空所有行程列。'); });
+
+document.getElementById('parse-paste-btn').addEventListener('click', () => {
+  const text = document.getElementById('paste-area').value.trim();
+  if (!text) return;
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  let added = 0;
+  for (const line of lines) {
+    const cols = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
+    if (cols.length < 4) continue;
+    const [depart, departPort, ret, returnPort, givenDays] = cols.map(c => c.trim());
+    if (!parseYMD(depart)) continue; // 略過標題列等非日期資料
+    addTripRow({ depart, departPort, return: ret, returnPort, givenDays });
+    added++;
+  }
+  if (added === 0) showStatus('未能解析出任何行程資料，請確認格式為「出境日期、出境港口、入境日期、入境港口、（居住國外天數）」以 Tab 分隔。', 'error');
+  else showStatus(`已解析並加入 ${added} 筆行程，「計入／不計入」已依居住國外天數欄位自動判斷，如需更正可點擊該標籤。`);
+});
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = evt => {
+    try {
+      const wb = XLSX.read(evt.target.result, { type: 'array', cellDates: false });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+      // 姓名 / 出生日期
+      let name = '', birth = '';
+      for (const row of grid) {
+        if (row[0] && String(row[0]).includes('姓名')) name = row[1] || '';
+        if (row[0] && String(row[0]).includes('出生日期')) birth = row[1] || '';
+      }
+      if (name) document.getElementById('f-name').value = name;
+      if (birth) document.getElementById('f-birth').value = toInputDate(birth);
+
+      // 找出「出境」表頭列
+      let headerIdx = -1;
+      for (let i = 0; i < grid.length; i++) {
+        if (grid[i][0] && String(grid[i][0]).trim() === '出境') { headerIdx = i; break; }
+      }
+      if (headerIdx === -1) { showStatus('找不到「出境」欄位標頭，請確認檔案格式。', 'error'); return; }
+      const dataStart = headerIdx + 2; // 跳過「日期/港口」子標頭列
+      tbody.innerHTML = '';
+      let added = 0;
+      for (let i = dataStart; i < grid.length; i++) {
+        const row = grid[i];
+        const depart = row[0];
+        if (!depart || String(depart).trim() === '') break;
+        if (!parseYMD(depart)) continue;
+        addTripRow({ depart: row[0], departPort: row[1], return: row[2], returnPort: row[3], givenDays: row[4] });
+        added++;
+      }
+      showStatus(`已匯入 ${added} 筆出入境紀錄${name?`（${name}）`:''}，「計入／不計入」已依檔案原有的「居住國外天數」欄位自動判斷，按「開始試算」即可。`);
+    } catch (err) {
+      showStatus('讀取檔案失敗：' + err.message, 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+});
+
+function getTrips() {
+  const rows = [];
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const depart = tr.querySelector('.c-depart').value.replaceAll('-','/');
+    const departPort = tr.querySelector('.c-departPort').value;
+    const ret = tr.querySelector('.c-return').value.replaceAll('-','/');
+    const returnPort = tr.querySelector('.c-returnPort').value;
+    const counted = tr.querySelector('.c-counted-tag').dataset.counted === 'true';
+    const isHome = tr.querySelector('.c-home-tag').dataset.home === 'true';
+    if (!depart) return;
+    rows.push({ depart, departPort, return: ret || '', returnPort, counted, isHome });
+  });
+  return rows;
+}
+
+function runCalculation() {
+  const birthStr = document.getElementById('f-birth').value.replaceAll('-','/');
+  const queryStr = document.getElementById('f-query').value.replaceAll('-','/');
+  if (!birthStr) { showStatus('請輸入出生日期', 'error'); return; }
+  if (!queryStr) { showStatus('請輸入查詢／申請基準日', 'error'); return; }
+  const trips = getTrips();
+  const r = calculate(trips, birthStr, queryStr);
+  document.getElementById('status-banner').style.display = 'none';
+  renderResults(r);
+}
+
+document.getElementById('calc-btn').addEventListener('click', runCalculation);
+
+function badge(el, pass, textPass, textFail, textUnknown) {
+  el.className = 'badge ' + (pass === null ? 'unknown' : pass ? 'pass' : 'fail');
+  el.textContent = pass === null ? (textUnknown||'待確認') : pass ? (textPass||'符合') : (textFail||'不符合');
+}
+
+function renderResults(r) {
+  document.getElementById('results-wrap').style.display = 'flex';
+
+  // ① 1460
+  badge(document.getElementById('badge-1460'), r.day1460Pass, '已達標', '未達標');
+  document.getElementById('big-1460').innerHTML = `${r.totalAbroadDays} <span style="font-size:1rem;color:#999;">日 ／ 1460 日</span>`;
+  document.getElementById('bar-1460').style.width = Math.min(100, r.totalAbroadDays / 1460 * 100) + '%';
+  document.getElementById('sub-1460').textContent = r.day1460Pass
+    ? `於 ${fmtYMD(r.day1460Date)} 累計滿1460日達標`
+    : `尚差 ${1460 - r.totalAbroadDays} 日`;
+
+  // ② 僑居地居留天數（方式A：連續6個月／方式B：最近兩年每年240日，任一即可）
+  badge(document.getElementById('badge-residency'), r.residencyPass, '已達標', '未達標');
+
+  badge(document.getElementById('badge-6mo'), r.sixMonthPass, '已滿6個月', '未滿6個月');
+  document.getElementById('detail-6mo').innerHTML = r.longestContinuous
+    ? `最長單筆連續居住：${fmtYMD(r.longestContinuous.start)} ～ ${fmtYMD(r.longestContinuous.end)}（共 ${r.longestContinuous.days} 日）`
+    : '無計入之出入境紀錄。';
+
+  badge(document.getElementById('badge-240'), r.twoYear240Pass, '已達標', '未達標');
+  document.getElementById('detail-240').innerHTML = '';
+  const rollGrid = document.getElementById('roll-window-grid');
+  rollGrid.innerHTML = '';
+  [{ label: '最近一年', w: r.rollWin1 }, { label: '再前一年', w: r.rollWin2 }].forEach(item => {
+    const chip = document.createElement('div');
+    chip.className = 'year-chip ' + (item.w.pass ? 'pass' : 'fail');
+    chip.innerHTML = `<div class="yc-year">${item.label}<br>${fmtYMD(item.w.start)}～${fmtYMD(item.w.end)}</div><div class="yc-days">${item.w.days} 日</div><div style="font-size:0.72rem;color:#999;">${item.w.pass?'≥240日':'<240日'}</div>`;
+    rollGrid.appendChild(chip);
+  });
+
+  // ③④ 役男相關
+  const isMale = document.getElementById('f-ismale').checked;
+  document.getElementById('card-role').style.display = isMale ? 'block' : 'none';
+  document.getElementById('card-path').style.display = isMale ? 'block' : 'none';
+
+  if (isMale) {
+    const nearGrid = document.getElementById('near-age-grid');
+    nearGrid.innerHTML = '';
+    r.nearAgeCheck.forEach(y => {
+      const chip = document.createElement('div');
+      chip.className = 'year-chip ' + (y.pass ? 'pass' : 'fail');
+      chip.innerHTML = `<div class="yc-year">${y.year} 年（${y.age}歲）</div><div class="yc-days">${y.twDays} 日</div><div style="font-size:0.72rem;color:#999;">${y.pass?'≤183日':'>183日'}</div>`;
+      nearGrid.appendChild(chip);
+    });
+
+    const permitStr = document.getElementById('f-permit').value.replaceAll('-','/');
+    const role = evaluateRolePath(r, permitStr);
+    const conclusionCard = document.getElementById('card-path');
+    const verdictEl = document.getElementById('conclusion-verdict');
+    const detailPath = document.getElementById('detail-path');
+    const notesBox = document.getElementById('notes-path');
+
+    function setVerdict(cls, text) {
+      conclusionCard.className = 'card conclusion-card ' + cls;
+      verdictEl.className = 'conclusion-verdict ' + cls;
+      verdictEl.textContent = text;
+    }
+
+    if (!role.basicReady) {
+      setVerdict('fail', '尚不符合');
+      detailPath.innerHTML = role.reasons.map(x => `・${x}`).join('<br>');
+      notesBox.style.display = 'none';
+    } else {
+      if (role.overallPass === null) setVerdict('unknown', '需人工確認居留資格後才能判定');
+      else setVerdict(role.overallPass ? 'pass' : 'fail', role.overallPass ? '初步符合資格' : '不符合資格');
+      detailPath.innerHTML = role.explanation;
+      if (role.notes.length) {
+        notesBox.style.display = 'block';
+        notesBox.innerHTML = '<ul>' + role.notes.map(n => `<li>${n}</li>`).join('') + '</ul>';
+      } else {
+        notesBox.style.display = 'none';
+      }
+    }
+  }
+
+  // 稽核表
+  const auditBody = document.getElementById('audit-tbody');
+  auditBody.innerHTML = '';
+  r._T.forEach(t => {
+    const tr = document.createElement('tr');
+    const days = t.counted ? diffDaysInclusive(t.depart, t.return || parseYMD(document.getElementById('f-query').value.replaceAll('-','/'))) : 0;
+    tr.innerHTML = `
+      <td>${fmtYMD(t.depart)}</td><td>${t.departPort}</td>
+      <td>${t.return ? fmtYMD(t.return) : '（進行中）'}</td><td>${t.returnPort}</td>
+      <td><span class="tag ${t.counted?'in':'out'}">${t.counted?'計入':'不計入'}</span></td>
+      <td><span class="tag ${t.isHome?'in':'out'}">${t.isHome?'僑居地':'其他國家'}</span></td>
+      <td>${t.counted ? days + ' 日' : '－'}</td>
+    `;
+    auditBody.appendChild(tr);
+  });
+
+  document.getElementById('results-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+</script>
+</body>
+</html>
