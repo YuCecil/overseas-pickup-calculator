@@ -65,7 +65,8 @@
   table.trip-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:0.88rem; }
   table.trip-table th, table.trip-table td { border-bottom:1px solid #eee; padding:6px 6px; text-align:center; }
   table.trip-table th { color:#888; font-weight:normal; font-size:0.8rem; }
-  table.trip-table input[type=text] { width:100%; min-width:80px; padding:4px 6px; font-size:0.85rem; }
+  table.trip-table input[type=text] { width:100%; min-width:80px; padding:4px 6px; font-size:0.85rem; transition:background .15s, border-color .15s; }
+  table.trip-table input[type=text].port-home { background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32; font-weight:bold; }
   .trip-days-cell { color:#1565c0; font-weight:bold; }
 
   .badge { display:inline-flex; align-items:center; justify-content:center; padding:4px 14px; border-radius:20px; font-size:0.88rem; font-weight:bold; color:#fff; white-space:nowrap; }
@@ -239,6 +240,7 @@
           <div class="year-grid" id="roll-window-grid" style="margin-top:10px;"></div>
         </div>
       </div>
+      <div id="residency-rescue-box" style="display:none; margin-top:14px;"></div>
     </div>
 
     <div class="card" id="card-role" style="display:none;">
@@ -411,9 +413,76 @@ function deriveIsHome(departPort, returnPort, homeCountryRaw) {
   return normalizeCountry(c1) === homeCountry && normalizeCountry(c2) === homeCountry;
 }
 
-function calculate(trips, birthStr, queryStr) {
+// 給定一組「僑居地」區間（{start,end,days}[]）與查詢日，算出方式A（連續6個月）
+// 與方式B（最近兩年每年240日，滾動區間）的結果。抽出成獨立函式，
+// 好讓「補件試算」可以模擬「多補幾筆之後，②會不會通過」而不用整個 calculate() 重跑。
+function evaluateResidencyRows(homeRows, query) {
+  const sorted = [...homeRows].sort((a, b) => a.start - b.start);
+  const mergedBlocks = [];
+  for (const iv of sorted) {
+    const last = mergedBlocks[mergedBlocks.length - 1];
+    if (last && iv.start <= addDays(last.end, 1)) {
+      if (iv.end > last.end) last.end = iv.end;
+      last.ongoing = last.ongoing || iv.ongoing;
+    } else {
+      mergedBlocks.push({ start: iv.start, end: iv.end, ongoing: iv.ongoing });
+    }
+  }
+
+  let longestContinuous = null;
+  let sixMonthSatisfiedDate = null;
+  for (const b of mergedBlocks) {
+    const sixMoMark = addDays(addMonths(b.start, 6), -1);
+    const days = diffDaysInclusive(b.start, b.end);
+    if (!longestContinuous || days > longestContinuous.days) longestContinuous = { start: b.start, end: b.end, days };
+    if (b.end >= sixMoMark) {
+      if (!sixMonthSatisfiedDate || sixMoMark < sixMonthSatisfiedDate) sixMonthSatisfiedDate = sixMoMark;
+    }
+  }
+  const sixMonthPass = !!sixMonthSatisfiedDate;
+
+  function sumHomeInWindow(winStart, winEnd) {
+    let total = 0;
+    for (const iv of sorted) {
+      const s = iv.start > winStart ? iv.start : winStart;
+      const e = iv.end < winEnd ? iv.end : winEnd;
+      if (s <= e) total += diffDaysInclusive(s, e);
+    }
+    return total;
+  }
+  const rollWin1 = { start: addDays(query, -364), end: query };
+  const rollWin2 = { start: addDays(query, -729), end: addDays(query, -365) };
+  rollWin1.days = sumHomeInWindow(rollWin1.start, rollWin1.end);
+  rollWin2.days = sumHomeInWindow(rollWin2.start, rollWin2.end);
+  rollWin1.pass = rollWin1.days >= 240;
+  rollWin2.pass = rollWin2.days >= 240;
+  const twoYear240Pass = rollWin1.pass && rollWin2.pass;
+  const twoYear240SatisfiedDate = twoYear240Pass ? query : null;
+
+  const abroadByYear = {};
+  for (const iv of sorted) {
+    let y = iv.start.getUTCFullYear();
+    const endY = iv.end.getUTCFullYear();
+    for (; y <= endY; y++) {
+      const yStart = new Date(Date.UTC(y, 0, 1));
+      const yEnd = new Date(Date.UTC(y, 11, 31));
+      const s = iv.start > yStart ? iv.start : yStart;
+      const e = iv.end < yEnd ? iv.end : yEnd;
+      if (s <= e) abroadByYear[y] = (abroadByYear[y] || 0) + diffDaysInclusive(s, e);
+    }
+  }
+
+  return {
+    mergedBlocks, longestContinuous, sixMonthPass, sixMonthSatisfiedDate,
+    rollWin1, rollWin2, twoYear240Pass, twoYear240SatisfiedDate, abroadByYear,
+    residencyPass: sixMonthPass || twoYear240Pass,
+  };
+}
+
+function calculate(trips, birthStr, queryStr, homeCountryStr) {
   const birth = parseYMD(birthStr);
   const query = parseYMD(queryStr);
+  const homeCountry = normalizeCountry(homeCountryStr || '');
   const T = trips
     .map(t => ({
       depart: parseYMD(t.depart),
@@ -447,63 +516,11 @@ function calculate(trips, birthStr, queryStr) {
   }));
   const homeRows = homeIntervals.map(iv => ({ ...iv, days: diffDaysInclusive(iv.start, iv.end) }));
 
-  const mergedBlocks = [];
-  for (const iv of homeRows) {
-    const last = mergedBlocks[mergedBlocks.length - 1];
-    if (last && iv.start <= addDays(last.end, 1)) {
-      if (iv.end > last.end) last.end = iv.end;
-      last.ongoing = last.ongoing || iv.ongoing;
-    } else {
-      mergedBlocks.push({ start: iv.start, end: iv.end, ongoing: iv.ongoing });
-    }
-  }
-
-  let longestContinuous = null;
-  let sixMonthSatisfiedDate = null;
-  for (const b of mergedBlocks) {
-    const sixMoMark = addDays(addMonths(b.start, 6), -1);
-    const days = diffDaysInclusive(b.start, b.end);
-    if (!longestContinuous || days > longestContinuous.days) longestContinuous = { start: b.start, end: b.end, days };
-    if (b.end >= sixMoMark) {
-      if (!sixMonthSatisfiedDate || sixMoMark < sixMonthSatisfiedDate) sixMonthSatisfiedDate = sixMoMark;
-    }
-  }
-  const sixMonthPass = !!sixMonthSatisfiedDate;
-
-  // 「最近兩年每年8個月(240天)」：以查詢日往前回推，每365天為一年（滾動區間，非曆年）
-  // 僅計算「僑居地」行程（homeRows），與境外總天數（abroadRows）分開
-  function sumHomeInWindow(winStart, winEnd) {
-    let total = 0;
-    for (const iv of homeRows) {
-      const s = iv.start > winStart ? iv.start : winStart;
-      const e = iv.end < winEnd ? iv.end : winEnd;
-      if (s <= e) total += diffDaysInclusive(s, e);
-    }
-    return total;
-  }
-  const rollWin1 = { start: addDays(query, -364), end: query };
-  const rollWin2 = { start: addDays(query, -729), end: addDays(query, -365) };
-  rollWin1.days = sumHomeInWindow(rollWin1.start, rollWin1.end);
-  rollWin2.days = sumHomeInWindow(rollWin2.start, rollWin2.end);
-  rollWin1.pass = rollWin1.days >= 240;
-  rollWin2.pass = rollWin2.days >= 240;
-  const twoYear240Pass = rollWin1.pass && rollWin2.pass;
-  const twoYear240SatisfiedDate = twoYear240Pass ? query : null;
-
-  // 每曆年僑居地天數，僅供逐年參考表顯示用
-  const abroadByYear = {};
-  for (const iv of homeRows) {
-    let y = iv.start.getUTCFullYear();
-    const endY = iv.end.getUTCFullYear();
-    for (; y <= endY; y++) {
-      const yStart = new Date(Date.UTC(y, 0, 1));
-      const yEnd = new Date(Date.UTC(y, 11, 31));
-      const s = iv.start > yStart ? iv.start : yStart;
-      const e = iv.end < yEnd ? iv.end : yEnd;
-      if (s <= e) abroadByYear[y] = (abroadByYear[y] || 0) + diffDaysInclusive(s, e);
-    }
-  }
-
+  const residency = evaluateResidencyRows(homeRows, query);
+  const {
+    mergedBlocks, longestContinuous, sixMonthPass, sixMonthSatisfiedDate,
+    rollWin1, rollWin2, twoYear240Pass, twoYear240SatisfiedDate, abroadByYear,
+  } = residency;
   const residencyPass = sixMonthPass || twoYear240Pass;
   const residencySatisfiedDate = [sixMonthSatisfiedDate, twoYear240Pass ? twoYear240SatisfiedDate : null]
     .filter(Boolean).sort(cmp)[0] || null;
@@ -557,6 +574,83 @@ function calculate(trips, birthStr, queryStr) {
     };
   }
 
+  // ===== 補件建議（②僑居地居留天數）＋ ①②同時達標的最小補件組合 =====
+  // 候選分兩種：
+  //  kind='excluded'：目前「不計入」的行程（觸及港澳／中國），補件後同時算進①與②
+  //                    （假設補件證實的地點就是您填寫的僑居國——這是本工具的推定，請自行核實）。
+  //  kind='not_home'：目前已「計入」但港口對不上僑居國的行程，補件後只影響②（①本來就已計入）。
+  function buildResidencyCandidates() {
+    const list = [];
+    for (const t of T) {
+      const end = t.return || query;
+      const days = diffDaysInclusive(t.depart, end);
+      if (days <= 0) continue;
+      if (!t.counted) {
+        list.push({
+          depart: t.depart, departPort: t.departPort, return: t.return, returnPort: t.returnPort,
+          ongoing: !t.return, days, kind: 'excluded',
+          departExcluded: suggestExcluded(t.departPort), returnExcluded: suggestExcluded(t.returnPort),
+        });
+      } else if (!t.isHome) {
+        const c1 = guessCountry(t.departPort), c2 = guessCountry(t.returnPort);
+        const departMismatch = !c1 || (homeCountry && normalizeCountry(c1) !== homeCountry);
+        const returnMismatch = !c2 || (homeCountry && normalizeCountry(c2) !== homeCountry);
+        list.push({
+          depart: t.depart, departPort: t.departPort, return: t.return, returnPort: t.returnPort,
+          ongoing: !t.return, days, kind: 'not_home', departMismatch, returnMismatch,
+        });
+      }
+    }
+    return list.sort((a, b) => b.days - a.days);
+  }
+
+  function toInterval(c) { return { start: c.depart, end: c.return || query, ongoing: c.ongoing, days: c.days }; }
+
+  // 從候選集合中貪婪選取（可補天數最長者優先），每加入一筆就重新檢驗②是否通過，通過就停止
+  function greedyForResidency(candidatePool, baseHomeRows) {
+    const picked = [];
+    let extra = [];
+    let res = evaluateResidencyRows(baseHomeRows.concat(extra), query);
+    if (res.residencyPass) return { picked, achievable: true, resultResidency: res };
+    for (const c of candidatePool) {
+      extra.push(toInterval(c));
+      picked.push(c);
+      res = evaluateResidencyRows(baseHomeRows.concat(extra), query);
+      if (res.residencyPass) return { picked, achievable: true, resultResidency: res };
+    }
+    return { picked, achievable: false, resultResidency: res };
+  }
+
+  let residencyRescuePlan = null; // ②獨立不足時使用（①本身已達標）
+  let combinedRescuePlan = null;  // ①②同時達標的最小補件組合（①不足時使用）
+
+  if (day1460Pass && !residencyPass) {
+    const pool = buildResidencyCandidates();
+    const g = greedyForResidency(pool, homeRows);
+    residencyRescuePlan = { hasCandidates: pool.length > 0, ...g };
+  }
+
+  if (!day1460Pass && rescuePlan && rescuePlan.achievable) {
+    // 先假設①所需補的這幾筆（type=excluded）補件後同時也證實為僑居地，檢查②是否因此一併達標
+    const abroadPickedIntervals = rescuePlan.picked.map(toInterval);
+    const afterAbroadRescue = evaluateResidencyRows(homeRows.concat(abroadPickedIntervals), query);
+    if (residencyPass || afterAbroadRescue.residencyPass) {
+      combinedRescuePlan = {
+        picked: rescuePlan.picked, extraForResidency: [], achievable: true,
+        residencyAlsoSatisfied: true,
+      };
+    } else {
+      // ②還不夠，從「①已挑的以外」的候選（含 not_home 類型）繼續貪婪補到②過為止
+      const pickedKeys = new Set(rescuePlan.picked.map(c => c.depart.getTime() + '_' + c.departPort + '_' + c.days));
+      const remainingPool = buildResidencyCandidates().filter(c => !pickedKeys.has(c.depart.getTime() + '_' + c.departPort + '_' + c.days));
+      const g = greedyForResidency(remainingPool, homeRows.concat(abroadPickedIntervals));
+      combinedRescuePlan = {
+        picked: rescuePlan.picked, extraForResidency: g.picked, achievable: g.achievable,
+        residencyAlsoSatisfied: false,
+      };
+    }
+  }
+
   const twSegmentsRaw = [];
   if (T.length === 0) {
     twSegmentsRaw.push({ entryReal: false, entryDate: birth, exitReal: false, exitDate: query });
@@ -605,7 +699,7 @@ function calculate(trips, birthStr, queryStr) {
     totalAbroadDays, day1460Pass, day1460Date, abroadRows, mergedBlocks, longestContinuous,
     sixMonthPass, sixMonthSatisfiedDate, abroadByYear, rollWin1, rollWin2, twoYear240Pass, twoYear240SatisfiedDate,
     residencyPass, residencySatisfiedDate, twByYear, twSegments, nearAgeCheck, basicSatisfiedDate,
-    birthYear, _T: T, rescuePlan,
+    birthYear, _T: T, rescuePlan, residencyRescuePlan, combinedRescuePlan, homeCountry,
   };
 }
 
@@ -756,10 +850,14 @@ function addTripRow(row) {
   const returnPortInput = tr.querySelector('.c-returnPort');
 
   function recomputeHomeFromPorts() {
-    if (tag.dataset.counted !== 'true') { setHomeTag(homeTag, false); return; }
     const hc = document.getElementById('f-homecountry').value;
+    colorizePortInput(departPortInput, hc);
+    colorizePortInput(returnPortInput, hc);
+    if (tag.dataset.counted !== 'true') { setHomeTag(homeTag, false); return; }
     setHomeTag(homeTag, deriveIsHome(departPortInput.value, returnPortInput.value, hc));
   }
+  colorizePortInput(departPortInput, document.getElementById('f-homecountry').value);
+  colorizePortInput(returnPortInput, document.getElementById('f-homecountry').value);
 
   tag.addEventListener('click', () => {
     const now = tag.dataset.counted === 'true';
@@ -782,6 +880,14 @@ function addTripRow(row) {
   recalcRowDays();
 }
 
+// 港口欄位若能自動比對為僑居國，直接把該欄位標色，方便一眼看出哪些城市屬於僑居地
+function colorizePortInput(input, homeCountryRaw) {
+  const hc = normalizeCountry(homeCountryRaw || '');
+  const c = guessCountry(input.value);
+  const match = !!(hc && c && normalizeCountry(c) === hc);
+  input.classList.toggle('port-home', match);
+}
+
 function setHomeTag(homeTagEl, v) {
   homeTagEl.dataset.home = v;
   homeTagEl.textContent = v ? '僑居地' : '其他國家';
@@ -795,9 +901,11 @@ function redetectHome() {
     const countedTag = tr.querySelector('.c-counted-tag');
     const homeTag = tr.querySelector('.c-home-tag');
     const counted = countedTag.dataset.counted === 'true';
-    const departPort = tr.querySelector('.c-departPort').value;
-    const returnPort = tr.querySelector('.c-returnPort').value;
-    const next = counted && deriveIsHome(departPort, returnPort, homeCountry);
+    const departPortInput = tr.querySelector('.c-departPort');
+    const returnPortInput = tr.querySelector('.c-returnPort');
+    colorizePortInput(departPortInput, homeCountry);
+    colorizePortInput(returnPortInput, homeCountry);
+    const next = counted && deriveIsHome(departPortInput.value, returnPortInput.value, homeCountry);
     if ((homeTag.dataset.home === 'true') !== next) changed++;
     setHomeTag(homeTag, next);
   });
@@ -900,7 +1008,8 @@ function runCalculation() {
   if (!birthStr) { showStatus('請輸入出生日期', 'error'); return; }
   if (!queryStr) { showStatus('請輸入查詢／申請基準日', 'error'); return; }
   const trips = getTrips();
-  const r = calculate(trips, birthStr, queryStr);
+  const homeCountryStr = document.getElementById('f-homecountry').value;
+  const r = calculate(trips, birthStr, queryStr, homeCountryStr);
   document.getElementById('status-banner').style.display = 'none';
   renderResults(r);
 }
@@ -912,9 +1021,16 @@ function badge(el, pass, textPass, textFail, textUnknown) {
   el.textContent = pass === null ? (textUnknown||'待確認') : pass ? (textPass||'符合') : (textFail||'不符合');
 }
 
-// 針對某筆「未計入」的行程，說明該補哪一段機票／入出境證明
+// 針對某筆候選行程，說明該補哪一段機票／入出境證明
+// kind='excluded'：目前不計入（觸及港澳／中國）；kind='not_home'：已計入但港口對不上僑居國
 function rescueInstruction(c) {
   const notes = [];
+  if (c.kind === 'not_home') {
+    if (c.departMismatch) notes.push(`請補證明「${c.departPort}」僅為轉機、實際仍在僑居地`);
+    if (c.returnMismatch) notes.push(`請補證明「${c.returnPort}」僅為轉機、實際仍在僑居地`);
+    if (notes.length === 0) notes.push('請補證明實際全程在僑居地');
+    return notes.join('；');
+  }
   if (c.departExcluded) {
     notes.push(`離開臺灣飛抵「${c.departPort}」後，請補實際前往僑居地／第三國的後續機票或入出境證明`);
   }
@@ -923,6 +1039,20 @@ function rescueInstruction(c) {
   }
   if (notes.length === 0) notes.push('請補其他段機票或入出境證明');
   return notes.join('；');
+}
+
+function rescueRowsTable(list) {
+  const rows = list.map(c => `
+    <tr>
+      <td>${fmtYMD(c.depart)}</td><td>${c.departPort}</td>
+      <td>${c.return ? fmtYMD(c.return) : '（進行中）'}</td><td>${c.returnPort}</td>
+      <td class="trip-days-cell">${c.days} 日</td>
+      <td style="text-align:left; font-size:0.82rem;">${rescueInstruction(c)}</td>
+    </tr>`).join('');
+  return `<table class="audit-table" style="margin-top:8px;">
+      <thead><tr><th>出境</th><th>港口</th><th>入境</th><th>港口</th><th>可補天數</th><th>需補件說明</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
 }
 
 function renderRescueBox(r) {
@@ -940,22 +1070,47 @@ function renderRescueBox(r) {
     return;
   }
 
-  const rows = rp.picked.map(c => `
-    <tr>
-      <td>${fmtYMD(c.depart)}</td><td>${c.departPort}</td>
-      <td>${c.return ? fmtYMD(c.return) : '（進行中）'}</td><td>${c.returnPort}</td>
-      <td class="trip-days-cell">${c.days} 日</td>
-      <td style="text-align:left; font-size:0.82rem;">${rescueInstruction(c)}</td>
-    </tr>`).join('');
-
-  box.innerHTML = `
+  let html = `
     <div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32;">
       尚差 <b>${rp.shortfall}</b> 日。只要就下面 <b>${rp.picked.length}</b> 筆行程補齊機票／入出境證明（共可補回 ${rp.gained} 日，累計達 ${rp.newTotal} 日），即可跨過1460日門檻。已依「可補天數」由多到少列出最少需補的筆數：
     </div>
-    <table class="audit-table" style="margin-top:8px;">
-      <thead><tr><th>出境</th><th>港口</th><th>入境</th><th>港口</th><th>可補天數</th><th>需補件說明</th></tr></thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+    ${rescueRowsTable(rp.picked)}`;
+
+  const cp = r.combinedRescuePlan;
+  if (cp) {
+    if (cp.residencyAlsoSatisfied) {
+      html += `<div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32; margin-top:10px;">補齊以上這幾筆後，②僑居地居留天數也會一併達標，不需要再另外補件。</div>`;
+    } else if (cp.extraForResidency.length > 0) {
+      if (cp.achievable) {
+        html += `<div class="note-box" style="margin-top:10px;">補齊以上這幾筆後，②僑居地居留天數仍不會達標，還需要「另外」多補以下 <b>${cp.extraForResidency.length}</b> 筆，才能讓①②同時達標：</div>${rescueRowsTable(cp.extraForResidency)}`;
+      } else {
+        html += `<div class="note-box" style="margin-top:10px;">補齊以上這幾筆後，①雖然達標，但②僑居地居留天數即使把其餘所有候選行程都補齊，仍無法達標，需另尋其他證明。</div>`;
+      }
+    }
+  }
+  box.innerHTML = html;
+}
+
+// 卡片②獨立的補件建議：只有在①已達標、但②（僑居地居留天數）未達標時才會用到
+function renderResidencyRescueBox(r) {
+  const box = document.getElementById('residency-rescue-box');
+  const rp = r.residencyRescuePlan;
+  if (!rp) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+
+  if (!rp.hasCandidates) {
+    box.innerHTML = `<div class="note-box">目前沒有其他候選行程可供補件。</div>`;
+    return;
+  }
+  if (!rp.achievable) {
+    box.innerHTML = `<div class="note-box">即使把下面所有候選行程都補齊機票／入出境證明，②僑居地居留天數仍無法達標，需另尋其他證明。</div>`;
+    return;
+  }
+  box.innerHTML = `
+    <div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32;">
+      只要就下面 <b>${rp.picked.length}</b> 筆行程補齊機票／入出境證明，即可讓②僑居地居留天數達標：
+    </div>
+    ${rescueRowsTable(rp.picked)}`;
 }
 
 function renderResults(r) {
@@ -989,6 +1144,7 @@ function renderResults(r) {
     chip.innerHTML = `<div class="yc-year">${item.label}<br>${fmtYMD(item.w.start)}～${fmtYMD(item.w.end)}</div><div class="yc-days">${item.w.days} 日</div><div style="font-size:0.72rem;color:#999;">${item.w.pass?'≥240日':'<240日'}</div>`;
     rollGrid.appendChild(chip);
   });
+  renderResidencyRescueBox(r);
 
   // ③④ 役男相關
   const isMale = document.getElementById('f-ismale').checked;
