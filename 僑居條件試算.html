@@ -211,6 +211,7 @@
       <div class="result-big" id="big-1460">0 <span style="font-size:1rem;color:#999;">日</span></div>
       <div class="progress-bar"><div class="progress-fill" id="bar-1460" style="width:0%"></div></div>
       <div class="result-sub" id="sub-1460"></div>
+      <div id="rescue-box" style="display:none; margin-top:14px;"></div>
     </div>
 
     <div class="card">
@@ -516,6 +517,46 @@ function calculate(trips, birthStr, queryStr) {
   }
   const day1460Pass = totalAbroadDays >= 1460;
 
+  // 補件建議：當在國外累計天數不足1460日時，找出目前「未計入」的行程中，
+  // 依可補天數由多到少（貪婪法，最少列數），最少需補齊哪幾列即可達標。
+  // 原理：統計表僅記錄「出境臺灣第一站」與「入境臺灣前最後一站」，若該站是港澳／中國（轉機），
+  // 整段不計入；但申請人實際在第三國，補上其他段機票／入出境證明即可將天數救回。
+  let rescuePlan = null;
+  if (!day1460Pass) {
+    const shortfall = 1460 - totalAbroadDays;
+    const candidates = T
+      .filter(t => !t.counted)
+      .map(t => {
+        const end = t.return || query;
+        return {
+          depart: t.depart, departPort: t.departPort,
+          return: t.return, returnPort: t.returnPort,
+          ongoing: !t.return,
+          days: diffDaysInclusive(t.depart, end),
+          departExcluded: suggestExcluded(t.departPort),
+          returnExcluded: suggestExcluded(t.returnPort),
+        };
+      })
+      .filter(c => c.days > 0)
+      .sort((a, b) => b.days - a.days);
+
+    const picked = [];
+    let gained = 0;
+    for (const c of candidates) {
+      if (gained >= shortfall) break;
+      picked.push(c);
+      gained += c.days;
+    }
+    const maxPossibleGain = candidates.reduce((s, c) => s + c.days, 0);
+    rescuePlan = {
+      shortfall, picked, gained,
+      achievable: gained >= shortfall,
+      newTotal: totalAbroadDays + gained,
+      maxPossibleTotal: totalAbroadDays + maxPossibleGain,
+      hasCandidates: candidates.length > 0,
+    };
+  }
+
   const twSegmentsRaw = [];
   if (T.length === 0) {
     twSegmentsRaw.push({ entryReal: false, entryDate: birth, exitReal: false, exitDate: query });
@@ -564,7 +605,7 @@ function calculate(trips, birthStr, queryStr) {
     totalAbroadDays, day1460Pass, day1460Date, abroadRows, mergedBlocks, longestContinuous,
     sixMonthPass, sixMonthSatisfiedDate, abroadByYear, rollWin1, rollWin2, twoYear240Pass, twoYear240SatisfiedDate,
     residencyPass, residencySatisfiedDate, twByYear, twSegments, nearAgeCheck, basicSatisfiedDate,
-    birthYear, _T: T,
+    birthYear, _T: T, rescuePlan,
   };
 }
 
@@ -871,6 +912,52 @@ function badge(el, pass, textPass, textFail, textUnknown) {
   el.textContent = pass === null ? (textUnknown||'待確認') : pass ? (textPass||'符合') : (textFail||'不符合');
 }
 
+// 針對某筆「未計入」的行程，說明該補哪一段機票／入出境證明
+function rescueInstruction(c) {
+  const notes = [];
+  if (c.departExcluded) {
+    notes.push(`離開臺灣飛抵「${c.departPort}」後，請補實際前往僑居地／第三國的後續機票或入出境證明`);
+  }
+  if (c.returnExcluded) {
+    notes.push(`返臺前，請補從實際居住地飛抵「${c.returnPort}」之前的機票或入出境證明`);
+  }
+  if (notes.length === 0) notes.push('請補其他段機票或入出境證明');
+  return notes.join('；');
+}
+
+function renderRescueBox(r) {
+  const box = document.getElementById('rescue-box');
+  const rp = r.rescuePlan;
+  if (!rp) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+
+  if (!rp.hasCandidates) {
+    box.innerHTML = `<div class="note-box">尚差 <b>${rp.shortfall}</b> 日，但目前沒有其他「未計入」的出入境紀錄可供補件。</div>`;
+    return;
+  }
+  if (!rp.achievable) {
+    box.innerHTML = `<div class="note-box">尚差 <b>${rp.shortfall}</b> 日；即使把下面所有未計入的行程全部補齊機票／入出境證明，最多也只能補回 <b>${rp.maxPossibleTotal - r.totalAbroadDays}</b> 日（累計 ${rp.maxPossibleTotal} 日），仍不足1460日，此路不通。</div>`;
+    return;
+  }
+
+  const rows = rp.picked.map(c => `
+    <tr>
+      <td>${fmtYMD(c.depart)}</td><td>${c.departPort}</td>
+      <td>${c.return ? fmtYMD(c.return) : '（進行中）'}</td><td>${c.returnPort}</td>
+      <td class="trip-days-cell">${c.days} 日</td>
+      <td style="text-align:left; font-size:0.82rem;">${rescueInstruction(c)}</td>
+    </tr>`).join('');
+
+  box.innerHTML = `
+    <div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32;">
+      尚差 <b>${rp.shortfall}</b> 日。只要就下面 <b>${rp.picked.length}</b> 筆行程補齊機票／入出境證明（共可補回 ${rp.gained} 日，累計達 ${rp.newTotal} 日），即可跨過1460日門檻。已依「可補天數」由多到少列出最少需補的筆數：
+    </div>
+    <table class="audit-table" style="margin-top:8px;">
+      <thead><tr><th>出境</th><th>港口</th><th>入境</th><th>港口</th><th>可補天數</th><th>需補件說明</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
 function renderResults(r) {
   document.getElementById('results-wrap').style.display = 'flex';
 
@@ -881,6 +968,8 @@ function renderResults(r) {
   document.getElementById('sub-1460').textContent = r.day1460Pass
     ? `於 ${fmtYMD(r.day1460Date)} 累計滿1460日達標`
     : `尚差 ${1460 - r.totalAbroadDays} 日`;
+
+  renderRescueBox(r);
 
   // ② 僑居地居留天數（方式A：連續6個月／方式B：最近兩年每年240日，任一即可）
   badge(document.getElementById('badge-residency'), r.residencyPass, '已達標', '未達標');
