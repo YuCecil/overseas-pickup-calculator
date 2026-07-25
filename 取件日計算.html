@@ -254,6 +254,142 @@
 
     .age-result-title  { font-size: 1rem; color: #444; font-weight: bold; margin-bottom: 4px; }
     .age-result-detail { font-size: 0.92rem; color: #666; line-height: 1.6; }
+
+    /* ── 案件追蹤提醒橫幅 ── */
+    .alert-banner {
+      display: none;
+      width: 100%;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: #fdecea;
+      color: #c62828;
+      border: 1px solid #f5c2c0;
+      border-radius: 14px;
+      padding: 14px 24px;
+      font-size: 1.05rem;
+      font-weight: bold;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    .alert-banner a {
+      color: #c62828;
+      text-decoration: underline;
+      font-weight: normal;
+      font-size: 0.9rem;
+    }
+
+    /* ── 案件追蹤清單 ── */
+    .track-box {
+      width: 100%;
+      background: #fff;
+      border-radius: 14px;
+      padding: 24px 28px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .track-hint { font-size: 0.8rem; color: #bbb; font-weight: normal; margin-left: 6px; }
+
+    .track-add-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin: 14px 0 18px;
+    }
+    .track-add-row input[type="text"] {
+      font-size: 1rem;
+      font-family: inherit;
+      border: 2px solid #d0d8e4;
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: #333;
+      outline: none;
+      flex: 1;
+      min-width: 160px;
+    }
+    .track-add-row input[type="text"]:focus { border-color: #1e88e5; }
+    #track-add-btn {
+      font-size: 0.95rem;
+      font-family: inherit;
+      background: #1565c0;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 20px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+    #track-add-btn:hover { background: #0d47a1; }
+
+    .track-empty { color: #bbb; font-size: 0.95rem; padding: 6px 0 4px; }
+    .track-status { color: #999; font-size: 0.9rem; padding: 6px 0 4px; }
+    .track-status.error { color: #c62828; }
+    .track-archive-toggle {
+      margin-top: 14px;
+      font-size: 0.85rem;
+      color: #1565c0;
+      cursor: pointer;
+      text-decoration: underline;
+      display: inline-block;
+    }
+
+    .track-table-wrap { width: 100%; overflow-x: auto; }
+    .track-table { width: 100%; border-collapse: collapse; }
+    .track-table th {
+      text-align: left;
+      font-size: 0.78rem;
+      color: #bbb;
+      font-weight: normal;
+      padding: 8px 10px;
+      border-bottom: 2px solid #f2f2f2;
+      white-space: nowrap;
+    }
+    .track-table td {
+      padding: 10px;
+      font-size: 0.95rem;
+      color: #444;
+      border-bottom: 1px solid #f2f2f2;
+      white-space: nowrap;
+    }
+    .track-table tr:last-child td { border-bottom: none; }
+
+    .track-badge {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: bold;
+      padding: 4px 12px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+    .track-badge.waiting   { background: #eee;    color: #999; }
+    .track-badge.alert     { background: #fdecea; color: #c62828; }
+    .track-badge.contacted { background: #fff3cd; color: #856404; }
+    .track-badge.done      { background: #e6f4ea; color: #2e7d32; }
+
+    .track-note-input {
+      font-size: 0.9rem;
+      font-family: inherit;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 5px 8px;
+      color: #444;
+      width: 140px;
+      max-width: 100%;
+    }
+    .track-note-input:focus { border-color: #1e88e5; outline: none; }
+
+    .track-del-btn {
+      background: none;
+      border: none;
+      color: #ccc;
+      font-size: 1.1rem;
+      cursor: pointer;
+      padding: 2px 8px;
+      border-radius: 6px;
+      transition: background .15s, color .15s;
+    }
+    .track-del-btn:hover { background: #fdecea; color: #c62828; }
+
     /* ── 小月曆（浮動） ── */
     .mini-cal {
       position: fixed;
@@ -364,6 +500,10 @@
 </div>
 
 <div class="page-layout">
+  <div id="alert-banner" class="alert-banner">
+    ⚠️ <span id="alert-count">0</span> 件案件已達確認提醒日，尚未收件，請聯繫台北確認
+  </div>
+
   <div class="date-picker-wrap">
     <label for="date-input">辦理日期：</label>
     <input type="date" id="date-input" class="date-text" min="1900-01-01" max="2099-12-31">
@@ -382,6 +522,53 @@
       <span class="card-weekday" id="d1-weekday"></span>
     </div>
     <div class="days-remaining" id="d1-remain"></div>
+  </div>
+
+  <!-- 案件追蹤清單 -->
+  <div class="track-box" id="track-box">
+    <div class="info-box-label">案件追蹤清單<span class="track-hint">（受理日＋3個工作天仍未收件，會提醒聯繫台北）</span></div>
+    <div class="track-add-row">
+      <input type="text" id="track-name" placeholder="姓名／備註（選填）">
+      <input type="date" id="track-date" class="date-text" min="1900-01-01" max="2099-12-31">
+      <button id="track-add-btn">新增</button>
+    </div>
+    <div id="track-status" class="track-status" style="display:none;"></div>
+    <div id="track-empty" class="track-empty" style="display:none;">目前沒有追蹤中的案件</div>
+    <div class="track-table-wrap">
+      <table id="track-table" class="track-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>姓名／備註</th>
+            <th>受理日期</th>
+            <th>確認提醒日</th>
+            <th>取件日</th>
+            <th>狀態</th>
+            <th>聯絡備註</th>
+            <th>已收件</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="track-tbody"></tbody>
+      </table>
+    </div>
+    <div id="track-archive-toggle" class="track-archive-toggle" style="display:none;"></div>
+    <div class="track-table-wrap">
+      <table id="track-archive-table" class="track-table" style="display:none;">
+        <thead>
+          <tr>
+            <th>姓名／備註</th>
+            <th>受理日期</th>
+            <th>確認提醒日</th>
+            <th>取件日</th>
+            <th>狀態</th>
+            <th>聯絡備註</th>
+            <th>已收件</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="track-archive-tbody"></tbody>
+      </table>
+    </div>
   </div>
 
   <!-- 附屬資訊 -->
@@ -687,6 +874,240 @@
     }
 
     bdayInput.addEventListener('change', update);
+  })();
+
+  // 案件追蹤清單（資料存在 Google 試算表，透過 Apps Script API 讀寫）
+  (function() {
+    const API_URL    = 'https://script.google.com/macros/s/AKfycbwEBbCdfSb057FFDVq9N4AKBk_f6Yn8_4B6l3IwHwZR8jIcmq8dY61wVw37t-DPJPzU/exec';
+    const ACCESS_KEY = 'bd7244df81ca37019fbd9a1dfd5e98be';
+
+    const nameInput     = document.getElementById('track-name');
+    const dateInput     = document.getElementById('track-date');
+    const addBtn        = document.getElementById('track-add-btn');
+    const tbody         = document.getElementById('track-tbody');
+    const table         = document.getElementById('track-table');
+    const empty         = document.getElementById('track-empty');
+    const statusEl      = document.getElementById('track-status');
+    const banner        = document.getElementById('alert-banner');
+    const alertCount    = document.getElementById('alert-count');
+    const archiveToggle = document.getElementById('track-archive-toggle');
+    const archiveTable  = document.getElementById('track-archive-table');
+    const archiveTbody  = document.getElementById('track-archive-tbody');
+
+    dateInput.value = getTaiwanToday();
+
+    let cases = [];
+    let archiveOpen = false;
+
+    function setStatus(text, isError) {
+      if (!text) { statusEl.style.display = 'none'; return; }
+      statusEl.textContent = text;
+      statusEl.className = 'track-status' + (isError ? ' error' : '');
+      statusEl.style.display = '';
+    }
+
+    async function api(action, payload) {
+      const key = ACCESS_KEY;
+      if (action === 'list') {
+        const url = `${API_URL}?action=list&key=${encodeURIComponent(key)}`;
+        const res = await fetch(url);
+        return res.json();
+      }
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify(Object.assign({ action, key }, payload))
+      });
+      return res.json();
+    }
+
+    function fmtShort(dateStr) {
+      const d = parseDate(dateStr);
+      return `${d.getUTCMonth()+1}/${d.getUTCDate()}（${WEEKDAYS[d.getUTCDay()]}）`;
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function rowHtml(item, today) {
+      const acceptAdj   = nearestWorkingDay(item.acceptDate);
+      const confirmDate = toKey(addWorkingDays(parseDate(acceptAdj), 3));
+      const pickupDate  = toKey(addWorkingDays(parseDate(acceptAdj), 4));
+
+      let badgeCls = 'waiting', badgeText = '尚未到確認日', isAlert = false;
+      if (item.received) {
+        badgeCls = 'done'; badgeText = '✅ 已收件';
+      } else if (today >= confirmDate) {
+        if (item.note && item.note.trim()) {
+          badgeCls = 'contacted'; badgeText = '📞 已聯絡，未到件';
+        } else {
+          badgeCls = 'alert'; badgeText = '⚠️ 需聯絡台北確認';
+          isAlert = true;
+        }
+      }
+
+      const html = `
+        <tr>
+          <td>${item.name ? escapeHtml(item.name) : '<span style="color:#ccc;">－</span>'}</td>
+          <td>${fmtShort(acceptAdj)}</td>
+          <td>${fmtShort(confirmDate)}</td>
+          <td>${fmtShort(pickupDate)}</td>
+          <td><span class="track-badge ${badgeCls}">${badgeText}</span></td>
+          <td><input type="text" class="track-note-input" data-id="${item.id}" value="${escapeHtml(item.note || '')}"></td>
+          <td style="text-align:center;"><input type="checkbox" class="track-received-cb" data-id="${item.id}" ${item.received ? 'checked' : ''}></td>
+          <td><button class="track-del-btn" data-id="${item.id}" title="刪除">✕</button></td>
+        </tr>`;
+      return { html, isAlert };
+    }
+
+    function bindRowEvents(container) {
+      container.querySelectorAll('.track-note-input').forEach(input => {
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') input.blur(); });
+        input.addEventListener('change', () => {
+          const item = cases.find(x => x.id === input.dataset.id);
+          const prev = item ? item.note : null;
+          const value = input.value;
+          if (item) item.note = value;
+          render();
+          api('update', { id: input.dataset.id, note: value })
+            .then(data => {
+              if (data && data.error) throw new Error(data.error);
+            })
+            .catch(() => {
+              if (item) item.note = prev;
+              setStatus('備註更新失敗，請檢查網路連線後再試', true);
+              render();
+            });
+        });
+      });
+      container.querySelectorAll('.track-received-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const item = cases.find(x => x.id === cb.dataset.id);
+          const prev = item ? item.received : null;
+          if (item) item.received = cb.checked;
+          render();
+          api('update', { id: cb.dataset.id, received: cb.checked })
+            .then(data => {
+              if (data && data.error) throw new Error(data.error);
+            })
+            .catch(() => {
+              if (item) item.received = prev;
+              setStatus('更新失敗，請檢查網路連線後再試', true);
+              render();
+            });
+        });
+      });
+      container.querySelectorAll('.track-del-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = cases.findIndex(x => x.id === btn.dataset.id);
+          const removed = idx > -1 ? cases.splice(idx, 1)[0] : null;
+          render();
+          api('delete', { id: btn.dataset.id })
+            .then(data => {
+              if (data && data.error) throw new Error(data.error);
+            })
+            .catch(() => {
+              if (removed) cases.push(removed);
+              setStatus('刪除失敗，請檢查網路連線後再試', true);
+              render();
+            });
+        });
+      });
+    }
+
+    function render() {
+      const today = getTaiwanToday();
+      const active = [];
+      const archived = [];
+      cases
+        .slice()
+        .sort((a, b) => a.acceptDate < b.acceptDate ? -1 : a.acceptDate > b.acceptDate ? 1 : 0)
+        .forEach(item => {
+          if (item.received) archived.push(item);
+          else active.push(item);
+        });
+
+      let alertN = 0;
+      const activeRows = active.map(item => {
+        const r = rowHtml(item, today);
+        if (r.isAlert) alertN++;
+        return r.html;
+      });
+      tbody.innerHTML = activeRows.join('');
+      table.style.display = active.length ? '' : 'none';
+      empty.style.display = active.length ? 'none' : '';
+
+      if (alertN > 0) {
+        alertCount.textContent = alertN;
+        banner.style.display = 'flex';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      if (archived.length) {
+        archiveToggle.style.display = '';
+        archiveToggle.textContent = archiveOpen
+          ? `隱藏已封存案件（${archived.length}）`
+          : `顯示已封存案件（${archived.length}）`;
+        archiveTbody.innerHTML = archived.map(item => rowHtml(item, today).html).join('');
+        archiveTable.style.display = archiveOpen ? '' : 'none';
+      } else {
+        archiveToggle.style.display = 'none';
+        archiveTable.style.display = 'none';
+      }
+
+      bindRowEvents(tbody);
+      bindRowEvents(archiveTbody);
+    }
+
+    async function load() {
+      setStatus('讀取中…');
+      try {
+        const data = await api('list');
+        if (data.error) { setStatus('讀取失敗：' + data.error, true); return; }
+        cases = data.cases || [];
+        setStatus('');
+        render();
+      } catch (err) {
+        setStatus('無法連線到案件清單，請檢查網路連線', true);
+      }
+    }
+
+    archiveToggle.addEventListener('click', () => {
+      archiveOpen = !archiveOpen;
+      render();
+    });
+
+    addBtn.addEventListener('click', () => {
+      if (!dateInput.value) return;
+      const name = nameInput.value.trim();
+      const acceptDate = dateInput.value;
+      const tempId = 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+      cases.push({ id: tempId, name, acceptDate, received: false, note: '', createdAt: new Date().toISOString() });
+      nameInput.value = '';
+      dateInput.value = getTaiwanToday();
+      setStatus('');
+      render();
+
+      api('add', { name, acceptDate })
+        .then(data => {
+          if (data && data.error) throw new Error(data.error);
+          const idx = cases.findIndex(x => x.id === tempId);
+          if (idx > -1) cases[idx] = data.case;
+          render();
+        })
+        .catch(() => {
+          const idx = cases.findIndex(x => x.id === tempId);
+          if (idx > -1) cases.splice(idx, 1);
+          setStatus('新增失敗，請檢查網路連線後再試', true);
+          render();
+        });
+    });
+
+    load();
   })();
 </script>
 </body>
