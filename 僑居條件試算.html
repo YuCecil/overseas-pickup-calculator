@@ -285,7 +285,16 @@ function fmtYMD(d) {
   return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
 }
 function addDays(d, n) { const r = new Date(d); r.setUTCDate(r.getUTCDate() + n); return r; }
-function addMonths(d, n) { const r = new Date(d); r.setUTCMonth(r.getUTCMonth() + n); return r; }
+function addMonths(d, n) {
+  // 直接用 setUTCMonth 對月底日期（例如8/31加6個月）會溢位到下個月（變成3/3而非2/28/29），
+  // 導致「連續6個月」門檻在這類邊界情況下反而變嚴格。改為：先定位到目標月份的1號，
+  // 再依目標月天數把日期夾回月底（例如8/31+6個月夾到隔年2/28或2/29）。
+  const day = d.getUTCDate();
+  const firstOfTargetMonth = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1));
+  const daysInTargetMonth = new Date(Date.UTC(firstOfTargetMonth.getUTCFullYear(), firstOfTargetMonth.getUTCMonth() + 1, 0)).getUTCDate();
+  firstOfTargetMonth.setUTCDate(Math.min(day, daysInTargetMonth));
+  return firstOfTargetMonth;
+}
 function diffDaysInclusive(start, end) { return Math.round((end - start) / 86400000) + 1; }
 function cmp(a, b) { return a - b; }
 
@@ -484,19 +493,26 @@ function calculate(trips, birthStr, queryStr, homeCountryStr) {
   const query = parseYMD(queryStr);
   const homeCountry = normalizeCountry(homeCountryStr || '');
   const T = trips
-    .map(t => ({
-      depart: parseYMD(t.depart),
-      departPort: t.departPort || '',
-      return: t.return ? parseYMD(t.return) : null,
-      returnPort: t.returnPort || '',
-      counted: !!t.counted,
-      isHome: !!t.isHome,
-    }))
+    .map(t => {
+      const depart = parseYMD(t.depart);
+      const ret = t.return ? parseYMD(t.return) : null;
+      return {
+        depart,
+        departPort: t.departPort || '',
+        return: ret,
+        returnPort: t.returnPort || '',
+        counted: !!t.counted,
+        isHome: !!t.isHome,
+        // 入境日早於出境日是不合理的顛倒資料，完全排除計算（不計入①、不算②、也不當補件候選），
+        // 避免算出負天數污染後續所有加總。
+        invalid: !!(depart && ret && ret < depart),
+      };
+    })
     .filter(t => t.depart)
     .sort((a, b) => a.depart - b.depart);
 
   // 境外累計居住天數（1460日）：只要不是中國大陸／港澳，不限定是不是僑居地那個特定國家
-  const abroadIntervals = T.filter(t => t.counted).map(t => ({
+  const abroadIntervals = T.filter(t => t.counted && !t.invalid).map(t => ({
     start: t.depart,
     end: t.return || query,
     ongoing: !t.return,
@@ -509,7 +525,7 @@ function calculate(trips, birthStr, queryStr, homeCountryStr) {
   });
 
   // 僑居地居留天數（方式A／方式B）：僅計入同時勾選「計入」且「僑居地」的行程
-  const homeIntervals = T.filter(t => t.counted && t.isHome).map(t => ({
+  const homeIntervals = T.filter(t => t.counted && t.isHome && !t.invalid).map(t => ({
     start: t.depart,
     end: t.return || query,
     ongoing: !t.return,
@@ -542,7 +558,7 @@ function calculate(trips, birthStr, queryStr, homeCountryStr) {
   if (!day1460Pass) {
     const shortfall = 1460 - totalAbroadDays;
     const candidates = T
-      .filter(t => !t.counted)
+      .filter(t => !t.counted && !t.invalid)
       .map(t => {
         const end = t.return || query;
         return {
@@ -582,6 +598,7 @@ function calculate(trips, birthStr, queryStr, homeCountryStr) {
   function buildResidencyCandidates() {
     const list = [];
     for (const t of T) {
+      if (t.invalid) continue; // 入境日早於出境日的顛倒資料，排除、不當補件候選
       const end = t.return || query;
       const days = diffDaysInclusive(t.depart, end);
       if (days <= 0) continue;
@@ -605,20 +622,83 @@ function calculate(trips, birthStr, queryStr, homeCountryStr) {
   }
 
   function toInterval(c) { return { start: c.depart, end: c.return || query, ongoing: c.ongoing, days: c.days }; }
+  function candidateKey(c) { return `${c.depart.getTime()}|${c.departPort}|${c.return ? c.return.getTime() : 'x'}|${c.returnPort}`; }
 
   // 從候選集合中貪婪選取（可補天數最長者優先），每加入一筆就重新檢驗②是否通過，通過就停止
+  // 用「補了這筆之後，離通過還有多遠」評分，而非單純比可補天數長短——
+  // 因為天數長的候選不一定對②有幫助（例如太久遠、跟其他行程不相鄰，湊不出連續6個月，
+  // 也不在最近兩年內，對方式B毫無貢獻）。每一步都試算全部剩餘候選，挑實際進度最大的那筆。
+  // 把「目前已採用的區間」＋「所有還沒選的候選」全部攤開，用跟 evaluateResidencyRows 相同的
+  // 零間隔相鄰規則去合併，算出每筆候選「如果它所在的這一串相鄰候選全部都補齊」最終能連成多長。
+  // 這樣才能分辨：一筆孤立、天數雖長但兩頭不接任何東西的候選（潛力=自己的天數，通常<183，沒用）
+  // 跟一串雖然個別天數不長、但彼此相鄰、合體後能跨過183天門檻的候選（潛力=整串合計天數，真的有用）。
+  function computeClusterPotential(currentIntervals, remainingCandidates) {
+    const items = currentIntervals.map(iv => ({ start: iv.start, end: iv.end, ref: null }))
+      .concat(remainingCandidates.map(c => ({ start: c.depart, end: c.return || query, ref: c })));
+    items.sort((a, b) => a.start - b.start);
+    const blocks = [];
+    for (const it of items) {
+      const last = blocks[blocks.length - 1];
+      if (last && it.start <= addDays(last.end, 1)) {
+        if (it.end > last.end) last.end = it.end;
+        last.refs.push(it.ref);
+      } else {
+        blocks.push({ start: it.start, end: it.end, refs: [it.ref] });
+      }
+    }
+    const map = new Map();
+    for (const b of blocks) {
+      const days = diffDaysInclusive(b.start, b.end);
+      for (const ref of b.refs) {
+        if (ref) map.set(ref, days);
+      }
+    }
+    return map;
+  }
+
+  function residencyProgress(res, clusterPotentialDays) {
+    // 方式A：只有當這筆候選所屬的「相鄰候選群」合體後真的有機會跨過183天，才給分數
+    // （分數＝該群合計天數佔183天的比例）；孤立、群體潛力不到183天的候選一律0分，
+    // 避免被天數雖長但兩頭都不相鄰任何東西的死路行程誤導。
+    const aFrac = clusterPotentialDays >= 183 ? Math.min(1, clusterPotentialDays / 183) : 0;
+    const bFrac = (Math.min(res.rollWin1.days, 240) + Math.min(res.rollWin2.days, 240)) / 480;
+    return Math.max(aFrac, bFrac);
+  }
   function greedyForResidency(candidatePool, baseHomeRows) {
     const picked = [];
-    let extra = [];
-    let res = evaluateResidencyRows(baseHomeRows.concat(extra), query);
+    let currentIntervals = baseHomeRows.slice();
+    let remaining = candidatePool.slice();
+    let res = evaluateResidencyRows(currentIntervals, query);
     if (res.residencyPass) return { picked, achievable: true, resultResidency: res };
-    for (const c of candidatePool) {
-      extra.push(toInterval(c));
-      picked.push(c);
-      res = evaluateResidencyRows(baseHomeRows.concat(extra), query);
+
+    while (remaining.length > 0) {
+      const clusterMap = computeClusterPotential(currentIntervals, remaining);
+      let bestIdx = -1, bestScore = -Infinity, bestRes = null;
+      for (let i = 0; i < remaining.length; i++) {
+        const trialRes = evaluateResidencyRows(currentIntervals.concat([toInterval(remaining[i])]), query);
+        const clusterPotential = clusterMap.get(remaining[i]) || remaining[i].days;
+        const score = trialRes.residencyPass ? Infinity : residencyProgress(trialRes, clusterPotential);
+        if (score > bestScore) { bestScore = score; bestIdx = i; bestRes = trialRes; }
+      }
+      const chosen = remaining.splice(bestIdx, 1)[0];
+      picked.push(chosen);
+      currentIntervals.push(toInterval(chosen));
+      res = bestRes;
       if (res.residencyPass) return { picked, achievable: true, resultResidency: res };
     }
     return { picked, achievable: false, resultResidency: res };
+  }
+
+  // 從候選集合中貪婪選取「不計入」的行程（可補天數最長者優先），補到①的天數缺口補滿為止
+  function greedyForAbroadTotal(candidatePool, currentTotal, alreadyGained) {
+    const picked = [];
+    let gained = alreadyGained;
+    for (const c of candidatePool) {
+      if (currentTotal + gained >= 1460) break;
+      picked.push(c);
+      gained += c.days;
+    }
+    return { picked, gained, achievable: currentTotal + gained >= 1460 };
   }
 
   let residencyRescuePlan = null; // ②獨立不足時使用（①本身已達標）
@@ -631,24 +711,52 @@ function calculate(trips, birthStr, queryStr, homeCountryStr) {
   }
 
   if (!day1460Pass && rescuePlan && rescuePlan.achievable) {
-    // 先假設①所需補的這幾筆（type=excluded）補件後同時也證實為僑居地，檢查②是否因此一併達標
-    const abroadPickedIntervals = rescuePlan.picked.map(toInterval);
-    const afterAbroadRescue = evaluateResidencyRows(homeRows.concat(abroadPickedIntervals), query);
-    if (residencyPass || afterAbroadRescue.residencyPass) {
-      combinedRescuePlan = {
-        picked: rescuePlan.picked, extraForResidency: [], achievable: true,
-        residencyAlsoSatisfied: true,
-      };
-    } else {
-      // ②還不夠，從「①已挑的以外」的候選（含 not_home 類型）繼續貪婪補到②過為止
-      const pickedKeys = new Set(rescuePlan.picked.map(c => c.depart.getTime() + '_' + c.departPort + '_' + c.days));
-      const remainingPool = buildResidencyCandidates().filter(c => !pickedKeys.has(c.depart.getTime() + '_' + c.departPort + '_' + c.days));
+    // 策略A「先湊①、再看②夠不夠」：以①本身的貪婪結果（挑可補天數最長者）為基礎，
+    // 假設這些補件後也證實為僑居地，檢查②是否因此一併達標；不夠才繼續從剩餘候選補到②過關。
+    function planAbroadFirst() {
+      const abroadPickedIntervals = rescuePlan.picked.map(toInterval);
+      const afterAbroadRescue = evaluateResidencyRows(homeRows.concat(abroadPickedIntervals), query);
+      if (residencyPass || afterAbroadRescue.residencyPass) {
+        return { allPicked: rescuePlan.picked, achievable: true };
+      }
+      const pickedKeys = new Set(rescuePlan.picked.map(candidateKey));
+      const remainingPool = buildResidencyCandidates().filter(c => !pickedKeys.has(candidateKey(c)));
       const g = greedyForResidency(remainingPool, homeRows.concat(abroadPickedIntervals));
-      combinedRescuePlan = {
-        picked: rescuePlan.picked, extraForResidency: g.picked, achievable: g.achievable,
-        residencyAlsoSatisfied: false,
-      };
+      return { allPicked: rescuePlan.picked.concat(g.picked), achievable: g.achievable };
     }
+
+    // 策略B「先湊②、再看①夠不夠」：先找出讓②達標所需的最少候選（含只影響②的 not_home 類型），
+    // 這些候選裡屬於「不計入」的部分本來就會同時算進①的天數，缺口不夠才用其餘候選（可補天數最長者優先）補滿①。
+    function planResidencyFirst() {
+      const allPool = buildResidencyCandidates();
+      const g2 = greedyForResidency(allPool, homeRows);
+      if (!g2.achievable) return null;
+      const gainFromG2 = g2.picked.filter(c => c.kind === 'excluded').reduce((s, c) => s + c.days, 0);
+      if (totalAbroadDays + gainFromG2 >= 1460) {
+        return { allPicked: g2.picked, achievable: true };
+      }
+      const usedKeys = new Set(g2.picked.map(candidateKey));
+      const remainingAbroadPool = T
+        .filter(t => !t.counted && !t.invalid)
+        .map(t => ({ depart: t.depart, departPort: t.departPort, return: t.return, returnPort: t.returnPort, ongoing: !t.return, days: diffDaysInclusive(t.depart, t.return || query) }))
+        .filter(c => c.days > 0 && !usedKeys.has(candidateKey(c)))
+        .sort((a, b) => b.days - a.days);
+      const g3 = greedyForAbroadTotal(remainingAbroadPool, totalAbroadDays, gainFromG2);
+      return { allPicked: g2.picked.concat(g3.picked), achievable: g3.achievable };
+    }
+
+    const planA = planAbroadFirst();
+    const planB = planResidencyFirst();
+
+    let chosen = planA;
+    if (planB && planB.achievable && (!planA.achievable || planB.allPicked.length < planA.allPicked.length)) {
+      chosen = planB;
+    }
+
+    combinedRescuePlan = {
+      allPicked: chosen.allPicked,
+      achievable: chosen.achievable,
+    };
   }
 
   const twSegmentsRaw = [];
@@ -918,9 +1026,20 @@ function recalcRowDays() {
     const d2raw = tr.querySelector('.c-return').value;
     const d2 = d2raw ? parseYMD(d2raw.replaceAll('-','/')) : null;
     const cell = tr.querySelector('.c-days');
-    if (d1 && d2) cell.textContent = diffDaysInclusive(d1, d2) + ' 日';
-    else if (d1 && !d2) cell.textContent = '進行中';
-    else cell.textContent = '－';
+    if (d1 && d2 && d2 < d1) {
+      // 入境日早於出境日，日期顛倒：明顯標紅提示，且不參與任何天數計算（已在 calculate() 排除）
+      cell.textContent = '日期顛倒';
+      cell.style.color = '#c62828';
+      cell.style.fontWeight = 'bold';
+      tr.style.background = '#fdecea';
+    } else {
+      cell.style.color = '';
+      cell.style.fontWeight = '';
+      tr.style.background = '';
+      if (d1 && d2) cell.textContent = diffDaysInclusive(d1, d2) + ' 日';
+      else if (d1 && !d2) cell.textContent = '進行中';
+      else cell.textContent = '－';
+    }
   });
 }
 
@@ -1070,25 +1189,27 @@ function renderRescueBox(r) {
     return;
   }
 
-  let html = `
-    <div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32;">
-      尚差 <b>${rp.shortfall}</b> 日。只要就下面 <b>${rp.picked.length}</b> 筆行程補齊機票／入出境證明（共可補回 ${rp.gained} 日，累計達 ${rp.newTotal} 日），即可跨過1460日門檻。已依「可補天數」由多到少列出最少需補的筆數：
-    </div>
-    ${rescueRowsTable(rp.picked)}`;
-
   const cp = r.combinedRescuePlan;
-  if (cp) {
-    if (cp.residencyAlsoSatisfied) {
-      html += `<div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32; margin-top:10px;">補齊以上這幾筆後，②僑居地居留天數也會一併達標，不需要再另外補件。</div>`;
-    } else if (cp.extraForResidency.length > 0) {
-      if (cp.achievable) {
-        html += `<div class="note-box" style="margin-top:10px;">補齊以上這幾筆後，②僑居地居留天數仍不會達標，還需要「另外」多補以下 <b>${cp.extraForResidency.length}</b> 筆，才能讓①②同時達標：</div>${rescueRowsTable(cp.extraForResidency)}`;
-      } else {
-        html += `<div class="note-box" style="margin-top:10px;">補齊以上這幾筆後，①雖然達標，但②僑居地居留天數即使把其餘所有候選行程都補齊，仍無法達標，需另尋其他證明。</div>`;
-      }
-    }
+
+  if (!cp || !cp.achievable) {
+    box.innerHTML = `
+      <div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32;">
+        尚差 <b>${rp.shortfall}</b> 日。只要就下面 <b>${rp.picked.length}</b> 筆行程補齊機票／入出境證明（共可補回 ${rp.gained} 日，累計達 ${rp.newTotal} 日），即可跨過1460日門檻。已依「可補天數」由多到少列出最少需補的筆數：
+      </div>
+      ${rescueRowsTable(rp.picked)}
+      <div class="note-box" style="margin-top:10px;">補齊以上這幾筆讓①達標後，②僑居地居留天數即使把其餘所有候選行程都補齊，仍無法達標，需另尋其他證明。</div>`;
+    return;
   }
-  box.innerHTML = html;
+
+  const list = cp.allPicked;
+  const sameAsAbroadOnly = list.length === rp.picked.length;
+  const note = sameAsAbroadOnly
+    ? `尚差 <b>${rp.shortfall}</b> 日。只要就下面 <b>${list.length}</b> 筆行程補齊機票／入出境證明，即可讓①②同時達標——這批本來就是①所需的最少筆數，補完後②會一併達標，不需要再另外補件：`
+    : `尚差 <b>${rp.shortfall}</b> 日。只要就下面 <b>${list.length}</b> 筆行程補齊機票／入出境證明，即可讓①②「同時」達標（已比較不同的搭配方式，取筆數最少的組合，非單純以①最長者優先）：`;
+
+  box.innerHTML = `
+    <div class="note-box" style="background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32;">${note}</div>
+    ${rescueRowsTable(list)}`;
 }
 
 // 卡片②獨立的補件建議：只有在①已達標、但②（僑居地居留天數）未達標時才會用到
@@ -1196,6 +1317,16 @@ function renderResults(r) {
   auditBody.innerHTML = '';
   r._T.forEach(t => {
     const tr = document.createElement('tr');
+    if (t.invalid) {
+      tr.style.background = '#fdecea';
+      tr.innerHTML = `
+        <td>${fmtYMD(t.depart)}</td><td>${t.departPort}</td>
+        <td>${t.return ? fmtYMD(t.return) : '（進行中）'}</td><td>${t.returnPort}</td>
+        <td colspan="3" style="color:#c62828; font-weight:bold;">日期顛倒（入境早於出境），已排除不計算</td>
+      `;
+      auditBody.appendChild(tr);
+      return;
+    }
     const days = t.counted ? diffDaysInclusive(t.depart, t.return || parseYMD(document.getElementById('f-query').value.replaceAll('-','/'))) : 0;
     tr.innerHTML = `
       <td>${fmtYMD(t.depart)}</td><td>${t.departPort}</td>
