@@ -307,6 +307,18 @@
       min-width: 160px;
     }
     .track-add-row input[type="text"]:focus { border-color: #1e88e5; }
+    .track-add-row select {
+      font-size: 1rem;
+      font-family: inherit;
+      border: 2px solid #d0d8e4;
+      border-radius: 8px;
+      padding: 7px 12px;
+      color: #333;
+      outline: none;
+      cursor: pointer;
+      background: #fff;
+    }
+    .track-add-row select:focus { border-color: #1e88e5; }
     #track-add-btn {
       font-size: 0.95rem;
       font-family: inherit;
@@ -337,16 +349,16 @@
     .track-table { width: 100%; border-collapse: collapse; }
     .track-table th {
       text-align: left;
-      font-size: 0.78rem;
+      font-size: 0.72rem;
       color: #bbb;
       font-weight: normal;
-      padding: 8px 10px;
+      padding: 6px 7px;
       border-bottom: 2px solid #f2f2f2;
       white-space: nowrap;
     }
     .track-table td {
-      padding: 10px;
-      font-size: 0.95rem;
+      padding: 7px;
+      font-size: 0.86rem;
       color: #444;
       border-bottom: 1px solid #f2f2f2;
       white-space: nowrap;
@@ -355,9 +367,9 @@
 
     .track-badge {
       display: inline-block;
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       font-weight: bold;
-      padding: 4px 12px;
+      padding: 3px 9px;
       border-radius: 20px;
       white-space: nowrap;
     }
@@ -367,13 +379,13 @@
     .track-badge.done      { background: #e6f4ea; color: #2e7d32; }
 
     .track-note-input {
-      font-size: 0.9rem;
+      font-size: 0.84rem;
       font-family: inherit;
       border: 1px solid #e0e0e0;
       border-radius: 6px;
-      padding: 5px 8px;
+      padding: 4px 6px;
       color: #444;
-      width: 140px;
+      width: 190px;
       max-width: 100%;
     }
     .track-note-input:focus { border-color: #1e88e5; outline: none; }
@@ -529,6 +541,10 @@
     <div class="info-box-label">案件追蹤清單<span class="track-hint">（受理日＋3個工作天仍未收件，會提醒聯繫台北）</span></div>
     <div class="track-add-row">
       <input type="text" id="track-name" placeholder="姓名">
+      <select id="track-method">
+        <option value="自取">自取</option>
+        <option value="郵寄">郵寄</option>
+      </select>
       <input type="date" id="track-date" class="date-text" min="1900-01-01" max="2099-12-31">
       <button id="track-add-btn">新增</button>
     </div>
@@ -539,6 +555,7 @@
         <thead>
           <tr>
             <th>姓名</th>
+            <th>領件方式</th>
             <th>受理日期</th>
             <th>確認提醒日</th>
             <th>取件日</th>
@@ -557,6 +574,7 @@
         <thead>
           <tr>
             <th>姓名</th>
+            <th>領件方式</th>
             <th>受理日期</th>
             <th>確認提醒日</th>
             <th>取件日</th>
@@ -882,6 +900,7 @@
     const ACCESS_KEY = 'bd7244df81ca37019fbd9a1dfd5e98be';
 
     const nameInput     = document.getElementById('track-name');
+    const methodInput   = document.getElementById('track-method');
     const dateInput     = document.getElementById('track-date');
     const addBtn        = document.getElementById('track-add-btn');
     const tbody         = document.getElementById('track-tbody');
@@ -951,6 +970,7 @@
       const html = `
         <tr>
           <td>${item.name ? escapeHtml(item.name) : '<span style="color:#ccc;">－</span>'}</td>
+          <td>${item.method ? escapeHtml(item.method) : '<span style="color:#ccc;">－</span>'}</td>
           <td>${fmtShort(acceptAdj)}</td>
           <td>${fmtShort(confirmDate)}</td>
           <td>${fmtShort(pickupDate)}</td>
@@ -1083,20 +1103,22 @@
     addBtn.addEventListener('click', () => {
       if (!dateInput.value) return;
       const name = nameInput.value.trim();
+      const method = methodInput.value;
       const acceptDate = dateInput.value;
       const tempId = 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-      cases.push({ id: tempId, name, acceptDate, received: false, note: '', createdAt: new Date().toISOString() });
+      cases.push({ id: tempId, name, method, acceptDate, received: false, note: '', createdAt: new Date().toISOString() });
       nameInput.value = '';
+      methodInput.value = '自取';
       dateInput.value = getTaiwanToday();
       setStatus('');
       render();
 
-      api('add', { name, acceptDate })
+      api('add', { name, method, acceptDate })
         .then(data => {
           if (data && data.error) throw new Error(data.error);
           const idx = cases.findIndex(x => x.id === tempId);
-          if (idx > -1) cases[idx] = data.case;
+          if (idx > -1) cases[idx] = Object.assign({}, data.case, { method: (data.case && data.case.method) || method });
           render();
         })
         .catch(() => {
