@@ -1118,8 +1118,37 @@
         .then(data => {
           if (data && data.error) throw new Error(data.error);
           const idx = cases.findIndex(x => x.id === tempId);
-          if (idx > -1) cases[idx] = Object.assign({}, data.case, { method: (data.case && data.case.method) || method });
+          if (idx === -1) return;
+
+          // 新增送出後，伺服器回應前使用者可能已經在暫存列的聯絡備註打字（此時打的字還是用舊的暫時 id，
+          // 伺服器根本不認得，直接覆寫會讓備註憑空消失），所以要接手暫存列當下畫面上的值，換成正式 id 後補送一次
+          const liveInput = tbody.querySelector(`.track-note-input[data-id="${tempId}"]`) ||
+                             archiveTbody.querySelector(`.track-note-input[data-id="${tempId}"]`);
+          const wasFocused = liveInput && document.activeElement === liveInput;
+          const selStart = wasFocused ? liveInput.selectionStart : null;
+          const pendingNote = liveInput ? liveInput.value : (cases[idx].note || '');
+          const pendingReceived = cases[idx].received;
+
+          const newCase = Object.assign({}, data.case, {
+            method: (data.case && data.case.method) || method,
+            note: pendingNote,
+            received: pendingReceived,
+          });
+          cases[idx] = newCase;
           render();
+
+          if (pendingNote || pendingReceived) {
+            api('update', { id: newCase.id, note: pendingNote, received: pendingReceived }).catch(() => {});
+          }
+
+          if (wasFocused) {
+            const newInput = tbody.querySelector(`.track-note-input[data-id="${newCase.id}"]`) ||
+                              archiveTbody.querySelector(`.track-note-input[data-id="${newCase.id}"]`);
+            if (newInput) {
+              newInput.focus();
+              if (selStart !== null) newInput.setSelectionRange(selStart, selStart);
+            }
+          }
         })
         .catch(() => {
           const idx = cases.findIndex(x => x.id === tempId);
