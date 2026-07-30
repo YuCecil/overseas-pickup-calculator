@@ -376,6 +376,7 @@
     .track-badge.waiting   { background: #eee;    color: #999; }
     .track-badge.alert     { background: #fdecea; color: #c62828; }
     .track-badge.contacted { background: #fff3cd; color: #856404; }
+    .track-badge.arrived   { background: #e3f2fd; color: #1565c0; }
     .track-badge.done      { background: #e6f4ea; color: #2e7d32; }
 
     .track-note-input {
@@ -561,7 +562,8 @@
             <th>取件日</th>
             <th>狀態</th>
             <th>聯絡備註</th>
-            <th>已收件</th>
+            <th>高雄已收到</th>
+            <th>已領取／收到</th>
             <th></th>
           </tr>
         </thead>
@@ -580,7 +582,8 @@
             <th>取件日</th>
             <th>狀態</th>
             <th>聯絡備註</th>
-            <th>已收件</th>
+            <th>高雄已收到</th>
+            <th>已領取／收到</th>
             <th></th>
           </tr>
         </thead>
@@ -954,10 +957,14 @@
       const acceptAdj   = nearestWorkingDay(item.acceptDate);
       const confirmDate = toKey(addWorkingDays(parseDate(acceptAdj), 3));
       const pickupDate  = toKey(addWorkingDays(parseDate(acceptAdj), 4));
+      const isSelf = item.method === '自取';
+      const isDone = isSelf ? !!item.personReceived : !!item.received;
 
       let badgeCls = 'waiting', badgeText = '尚未到確認日', isAlert = false;
-      if (item.received) {
-        badgeCls = 'done'; badgeText = '✅ 已收件';
+      if (isDone) {
+        badgeCls = 'done'; badgeText = '✅ 已完成';
+      } else if (isSelf && item.received) {
+        badgeCls = 'arrived'; badgeText = '📦 已到高雄，待領取';
       } else if (today >= confirmDate) {
         if (item.note && item.note.trim()) {
           badgeCls = 'contacted'; badgeText = '📞 已聯絡，未到件';
@@ -966,6 +973,11 @@
           isAlert = true;
         }
       }
+
+      const khhCell = isSelf
+        ? `<input type="checkbox" class="track-khh-cb" data-id="${item.id}" ${item.received ? 'checked' : ''}>`
+        : `<span style="color:#ccc;">－</span>`;
+      const personChecked = isSelf ? !!item.personReceived : !!item.received;
 
       const html = `
         <tr>
@@ -976,7 +988,8 @@
           <td>${fmtShort(pickupDate)}</td>
           <td><span class="track-badge ${badgeCls}">${badgeText}</span></td>
           <td><input type="text" class="track-note-input" data-id="${item.id}" value="${escapeHtml(item.note || '')}"></td>
-          <td style="text-align:center;"><input type="checkbox" class="track-received-cb" data-id="${item.id}" ${item.received ? 'checked' : ''}></td>
+          <td style="text-align:center;">${khhCell}</td>
+          <td style="text-align:center;"><input type="checkbox" class="track-person-cb" data-id="${item.id}" ${personChecked ? 'checked' : ''}></td>
           <td><button class="track-del-btn" data-id="${item.id}" title="刪除">✕</button></td>
         </tr>`;
       return { html, isAlert };
@@ -1002,7 +1015,7 @@
             });
         });
       });
-      container.querySelectorAll('.track-received-cb').forEach(cb => {
+      container.querySelectorAll('.track-khh-cb').forEach(cb => {
         cb.addEventListener('change', () => {
           const item = cases.find(x => x.id === cb.dataset.id);
           const prev = item ? item.received : null;
@@ -1014,6 +1027,25 @@
             })
             .catch(() => {
               if (item) item.received = prev;
+              setStatus('更新失敗，請檢查網路連線後再試', true);
+              render();
+            });
+        });
+      });
+      container.querySelectorAll('.track-person-cb').forEach(cb => {
+        cb.addEventListener('change', () => {
+          const item = cases.find(x => x.id === cb.dataset.id);
+          if (!item) return;
+          const field = item.method === '自取' ? 'personReceived' : 'received';
+          const prev = item[field];
+          item[field] = cb.checked;
+          render();
+          api('update', { id: item.id, [field]: cb.checked })
+            .then(data => {
+              if (data && data.error) throw new Error(data.error);
+            })
+            .catch(() => {
+              item[field] = prev;
               setStatus('更新失敗，請檢查網路連線後再試', true);
               render();
             });
@@ -1045,7 +1077,8 @@
         .slice()
         .sort((a, b) => a.acceptDate < b.acceptDate ? -1 : a.acceptDate > b.acceptDate ? 1 : 0)
         .forEach(item => {
-          if (item.received) archived.push(item);
+          const isDone = item.method === '自取' ? !!item.personReceived : !!item.received;
+          if (isDone) archived.push(item);
           else active.push(item);
         });
 
@@ -1107,7 +1140,7 @@
       const acceptDate = dateInput.value;
       const tempId = 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
-      cases.push({ id: tempId, name, method, acceptDate, received: false, note: '', createdAt: new Date().toISOString() });
+      cases.push({ id: tempId, name, method, acceptDate, received: false, personReceived: false, note: '', createdAt: new Date().toISOString() });
       nameInput.value = '';
       methodInput.value = '自取';
       dateInput.value = getTaiwanToday();
@@ -1128,17 +1161,19 @@
           const selStart = wasFocused ? liveInput.selectionStart : null;
           const pendingNote = liveInput ? liveInput.value : (cases[idx].note || '');
           const pendingReceived = cases[idx].received;
+          const pendingPersonReceived = cases[idx].personReceived;
 
           const newCase = Object.assign({}, data.case, {
             method: (data.case && data.case.method) || method,
             note: pendingNote,
             received: pendingReceived,
+            personReceived: pendingPersonReceived,
           });
           cases[idx] = newCase;
           render();
 
-          if (pendingNote || pendingReceived) {
-            api('update', { id: newCase.id, note: pendingNote, received: pendingReceived }).catch(() => {});
+          if (pendingNote || pendingReceived || pendingPersonReceived) {
+            api('update', { id: newCase.id, note: pendingNote, received: pendingReceived, personReceived: pendingPersonReceived }).catch(() => {});
           }
 
           if (wasFocused) {
