@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>僑居條件試算工具</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html { font-size: 18px; }
@@ -68,6 +69,8 @@
   table.trip-table input[type=text] { width:100%; min-width:80px; padding:4px 6px; font-size:0.85rem; transition:background .15s, border-color .15s; }
   table.trip-table input[type=text].port-home { background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32; font-weight:bold; }
   .trip-days-cell { color:#1565c0; font-weight:bold; }
+  tr.trip-row-uncertain { background:#fff8e1; }
+  tr.trip-row-uncertain input[type=text]:not(.port-home) { border-color:#ffca28; }
 
   .badge { display:inline-flex; align-items:center; justify-content:center; padding:4px 14px; border-radius:20px; font-size:0.88rem; font-weight:bold; color:#fff; white-space:nowrap; }
   .badge.pass { background:#43a047; }
@@ -162,10 +165,24 @@
   <div class="card">
     <div class="card-label">出入境行程（僑居國外時間累計統計表 上半部）</div>
     <div class="input-tabs">
-      <div class="tab-btn active" data-tab="upload">上傳 Excel 檔</div>
+      <div class="tab-btn active" data-tab="ocr">上傳照片／掃描檔（AI 辨識）</div>
+      <div class="tab-btn" data-tab="upload">上傳 Excel 檔</div>
       <div class="tab-btn" data-tab="paste">貼上表格</div>
     </div>
-    <div class="tab-panel active" id="tab-upload">
+    <div class="tab-panel active" id="tab-ocr">
+      <div class="field-row" style="margin-top:0;">
+        <label for="f-apikey">Anthropic API Key</label>
+        <input type="password" id="f-apikey" placeholder="sk-ant-..." style="flex:1; min-width:220px;">
+        <button class="btn btn-light btn-sm" id="save-apikey-btn">儲存在此瀏覽器</button>
+        <button class="btn btn-danger btn-sm" id="clear-apikey-btn">清除</button>
+      </div>
+      <div class="field-row" style="margin-top:14px;">
+        <input type="file" id="ocr-file-input" accept="image/*,.pdf,.heic,.heif" multiple>
+      </div>
+      <div style="margin-top:10px;"><button class="btn btn-primary btn-sm" id="ocr-run-btn">AI 辨識並匯入下方表格</button></div>
+      <div id="ocr-status" style="display:none; margin-top:12px; padding:10px 16px; border-radius:8px; font-size:0.88rem;"></div>
+    </div>
+    <div class="tab-panel" id="tab-upload">
       <input type="file" id="file-input" accept=".xlsx,.xls">
     </div>
     <div class="tab-panel" id="tab-paste">
@@ -1105,6 +1122,215 @@ document.getElementById('file-input').addEventListener('change', e => {
   };
   reader.readAsArrayBuffer(file);
 });
+
+/* ============ AI 圖片辨識匯入（Claude Vision API） ============ */
+const OCR_APIKEY_STORAGE_KEY = 'ocrClaudeApiKey';
+function getOcrApiKey() { return localStorage.getItem(OCR_APIKEY_STORAGE_KEY) || ''; }
+function setOcrApiKey(k) { localStorage.setItem(OCR_APIKEY_STORAGE_KEY, k); }
+function clearOcrApiKey() { localStorage.removeItem(OCR_APIKEY_STORAGE_KEY); }
+document.getElementById('f-apikey').value = getOcrApiKey();
+document.getElementById('save-apikey-btn').addEventListener('click', () => {
+  const v = document.getElementById('f-apikey').value.trim();
+  if (!v) return;
+  setOcrApiKey(v);
+});
+document.getElementById('clear-apikey-btn').addEventListener('click', () => {
+  clearOcrApiKey();
+  document.getElementById('f-apikey').value = '';
+});
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// AI 辨識時會依提示詞連同機場英文代號一起輸出（例如「多倫多YYZ」，方便比對原文件），
+// 但英文代號會干擾「是否為僑居地」的自動判斷，匯入前先去掉只留中文地名。
+function stripAirportCode(port) {
+  if (!port) return port;
+  return port.replace(/\s*\(?[A-Za-z]{2,4}\)?\s*$/, '').trim();
+}
+
+function showOcrStatus(msg, type) {
+  const el = document.getElementById('ocr-status');
+  el.style.display = 'block';
+  el.textContent = msg;
+  el.style.background = type === 'error' ? '#fdecea' : type === 'warn' ? '#fff8e1' : '#e8f5e9';
+  el.style.color = type === 'error' ? '#c62828' : type === 'warn' ? '#7a5c00' : '#2e7d32';
+}
+
+const OCR_PROMPT = `你正在協助工作人員把「入出境紀錄」或「入出國日期證明書」（內政部移民署核發，通常為1~2頁，可能有紅色大印章疊在文字上）的內容轉成可貼入試算工具的格式。請仔細比對每一個數字，尤其是被印章、水印蓋到的年份、月份、日期，不要憑印象猜測。
+
+如果同時附上多張圖片，代表是同一份文件的不同頁面（例如第1頁是個人資料、第2頁是出入境紀錄港口明細），請把所有頁面的資訊合併判讀成同一人的資料，不要重複列出同一筆紀錄兩次。
+
+請只輸出以下內容，不要加任何說明文字、不要用 Markdown、不要編號：
+
+第一行：如果圖片上看得到申請人的姓名與出生日期，輸出「姓名｜出生日期(YYYY/MM/DD)」，例如「劉擎光｜2007/02/07」；如果看不到，輸出「NONE」。
+
+從第二行開始，每一列輸出一筆出入境紀錄，四欄用 Tab 字元分隔，依序為：
+出境日期(YYYY/MM/DD)	出境地區	入境日期(YYYY/MM/DD)	入境地區
+
+規則：
+- 【非常重要，請務必遵守】文件上每一個項次自己的出境日期跟入境日期是綁在一起的一組資料（同一趟出國、同一趟回國），不管文件把「出境」跟「入境」印成左右兩個並排的清單、看起來像是兩份獨立名單，你都絕對不可以把所有列的出境日期抽出來單獨排序、把所有列的入境日期抽出來單獨排序，然後再重新兩兩配對——這樣配出來的日期組合是錯的。你只需要照文件上原本印的項次順序，一個項次一個項次地把「這個項次自己的」出境日期跟入境日期原封不動放進同一列輸出，不用幫我重新排序，我會自己處理排序。
+- 出境日期或入境日期若原文件為空白（例如最早一筆紀錄可能只有入境、沒有對應的出境），該欄留空，但仍要保留 Tab 分隔的四個欄位位置。
+- 出境地區、入境地區照原文件寫的地名／機場代碼原樣輸出即可（例如「多倫多YYZ」），不用翻譯或補全。
+- 如果某一列裡有任何一個數字你不是很確定（模糊、被印章蓋住、光線不好），在那一列最後面加上「〔請覆核〕」，並仍填入你認為最接近的答案，不要整列略過不寫。
+- 完全看不懂、判斷不出是不是一筆出入境紀錄的內容不要輸出。`;
+
+document.getElementById('ocr-run-btn').addEventListener('click', async () => {
+  const apiKey = getOcrApiKey() || document.getElementById('f-apikey').value.trim();
+  if (!apiKey) { showOcrStatus('請先輸入並儲存 Anthropic API Key。', 'error'); return; }
+  const files = document.getElementById('ocr-file-input').files;
+  if (!files || files.length === 0) { showOcrStatus('請先選擇圖片或 PDF 檔案。', 'error'); return; }
+
+  const SUPPORTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+  function isPdfFile(file) { return file.type === 'application/pdf' || /\.pdf$/i.test(file.name); }
+  function isHeicFile(file) { return file.type === 'image/heic' || file.type === 'image/heif' || /\.(heic|heif)$/i.test(file.name); }
+  for (const file of files) {
+    if (!isPdfFile(file) && !isHeicFile(file) && file.type && !SUPPORTED_IMAGE_TYPES.includes(file.type)) {
+      showOcrStatus(
+        `「${file.name}」是 ${file.type} 格式，Claude 不支援（只支援 JPG／PNG／GIF／WEBP／PDF／HEIC）。請改用截圖或轉存為 JPG 後再上傳。`,
+        'error'
+      );
+      return;
+    }
+  }
+
+  const btn = document.getElementById('ocr-run-btn');
+  btn.disabled = true;
+  showOcrStatus(`辨識中，共 ${files.length} 個檔案，請稍候（約10~30秒）...`);
+
+  try {
+    const contentBlocks = [];
+    for (const file of files) {
+      if (isPdfFile(file)) {
+        const b64 = await fileToBase64(file);
+        contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } });
+        continue;
+      }
+      if (isHeicFile(file)) {
+        showOcrStatus(`正在轉換 HEIC 圖片「${file.name}」...`);
+        if (typeof heic2any !== 'function') throw new Error('HEIC 轉換工具尚未載入成功，請檢查網路連線後重試，或改用 JPG／PNG 照片。');
+        let jpgBlob;
+        try {
+          const converted = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+          jpgBlob = Array.isArray(converted) ? converted[0] : converted;
+        } catch (heicErr) {
+          // 免費的瀏覽器端 HEIC 轉換函式庫沒有內建 HEVC 解碼器（專利授權問題），
+          // iPhone 實際拍照大多是用 HEVC 編碼，所以常常轉不了，不是網路或程式的問題。
+          throw new Error(
+            `「${file.name}」這張 HEIC 照片無法自動轉換（iPhone 拍照常用的 HEVC 編碼，免費轉換工具不支援）。請改用以下方式之一：① iPhone「設定→相機→格式」改選「最相容」，之後拍的照片就會直接是 JPG；② 用 Mac 預覽程式打開這張照片、輸出成 JPG 後再上傳；③ 直接把照片截圖後上傳截圖。`
+          );
+        }
+        const b64 = await fileToBase64(jpgBlob);
+        contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } });
+        continue;
+      }
+      const b64 = await fileToBase64(file);
+      contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: b64 } });
+    }
+    showOcrStatus(`辨識中，共 ${files.length} 個檔案，請稍候（約10~30秒）...`);
+    contentBlocks.push({ type: 'text', text: OCR_PROMPT });
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        max_tokens: 4096,
+        output_config: { effort: 'low' },
+        messages: [{ role: 'user', content: contentBlocks }],
+      }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) throw new Error((data && data.error && data.error.message) || `HTTP ${resp.status}`);
+    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    importOcrResult(text);
+  } catch (err) {
+    showOcrStatus('辨識失敗：' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function importOcrResult(text) {
+  // 注意：這裡不能對整行做 trim()，會把「沒有出境日期」那一列最前面用來標示空欄位的
+  // Tab 字元也一起清掉，導致該列變成只有3欄、被誤判成格式不完整而略過。
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  if (lines.length === 0) { showOcrStatus('AI 沒有回傳可用內容，請重試或改用「貼上表格」。', 'error'); return; }
+
+  let startIdx = 0;
+  const first = lines[0].trim();
+  if (first === 'NONE') {
+    startIdx = 1;
+  } else if (first.includes('｜')) {
+    const [name, birth] = first.split('｜').map(s => s.trim());
+    if (name) document.getElementById('f-name').value = name;
+    if (birth && parseYMD(birth)) document.getElementById('f-birth').value = toInputDate(birth);
+    startIdx = 1;
+  }
+
+  // 先把每一列解析成物件、保留「出境／入境本來就是同一項次一組」的配對，不假設 AI 有幫忙排序，
+  // 排序交給下面的程式碼自己做（依出境日期，缺出境日期的邊界資料則依入境日期），避免 AI 把兩欄
+  // 各自排序後配錯對。
+  const parsedRows = [];
+  let skipped = 0;
+  for (let i = startIdx; i < lines.length; i++) {
+    const cols = lines[i].split('\t').map(c => c.trim());
+    if (cols.length < 4) { skipped++; continue; }
+    const [departRaw, departPortRaw, returnRaw, returnPortRaw] = cols;
+    const departDate = parseYMD(departRaw);
+    const returnDate = parseYMD(returnRaw);
+    if (!departDate && !returnDate) { skipped++; continue; } // 兩個日期都看不出來，整列略過
+
+    let returnPort = returnPortRaw;
+    let uncertain = false;
+    if (returnPort && returnPort.includes('〔請覆核〕')) { uncertain = true; returnPort = returnPort.replace('〔請覆核〕', '').trim(); }
+
+    parsedRows.push({
+      sortKey: departDate || returnDate,
+      depart: departDate ? departRaw : '',
+      departPort: departDate ? stripAirportCode(departPortRaw) : '',
+      return: returnDate ? returnRaw : '',
+      returnPort: returnDate ? stripAirportCode(returnPort) : '',
+      uncertain,
+      boundary: !departDate,
+    });
+  }
+  parsedRows.sort((a, b) => a.sortKey - b.sortKey);
+
+  let added = 0, flagged = 0, boundary = 0;
+  for (const row of parsedRows) {
+    addTripRow({ depart: row.depart, departPort: row.departPort, return: row.return, returnPort: row.returnPort });
+    if (row.uncertain) {
+      const newRow = tbody.lastElementChild;
+      newRow.classList.add('trip-row-uncertain');
+      newRow.title = 'AI 標記這一列字跡不確定（可能被印章、浮水印蓋到），請核對原始文件後修正。';
+    }
+    added++;
+    if (row.boundary) boundary++;
+    if (row.uncertain) flagged++;
+  }
+
+  const notes = [];
+  if (boundary) notes.push(`其中 ${boundary} 筆只有入境、沒有出境日期（常見於在國外出生的最早一筆紀錄），已先只填入入境資料，天數暫不列入計算，請自行判斷後手動補上出境日期`);
+  if (skipped) notes.push(`另有 ${skipped} 列出境、入境日期都看不出來已略過`);
+  if (flagged) notes.push(`其中 ${flagged} 筆 AI 標記為字跡不確定，請特別核對原文件`);
+  showOcrStatus(
+    `已匯入 ${added} 筆行程${notes.length ? '；' + notes.join('；') : ''}。AI 辨識僅供參考，請務必核對原始文件後再使用。`,
+    (skipped || flagged || boundary) ? 'warn' : undefined
+  );
+}
 
 function getTrips() {
   const rows = [];
