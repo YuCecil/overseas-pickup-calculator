@@ -1,0 +1,86 @@
+// ============================================================
+// 用途：當「僑居條件試算工具」網頁上的 AI 辨識功能的代理伺服器。
+// 瀏覽器不會直接呼叫 Anthropic，而是呼叫這支 Apps Script，
+// 由這支程式代替瀏覽器去呼叫 Anthropic——這樣 Anthropic API Key
+// 就只會存在這支程式的私人設定裡，不會出現在 GitHub 上的任何程式碼。
+// ============================================================
+//
+// 【部署步驟】
+// 1. 到 https://script.google.com 建立一個新專案（New project）。
+// 2. 把整個檔案的內容貼進去，取代預設的 Code.gs。
+// 3. 左側選單點「專案設定」（齒輪圖示）→ 找到「腳本屬性」（Script Properties）
+//    → 新增屬性：屬性名稱填 ANTHROPIC_API_KEY，值填你的 Anthropic API Key，按存檔。
+//    （建議去 Anthropic 後台另外申請一支「專用」金鑰給這個工具用，並設定用量上限，
+//      不要用你自己主要在用的那支。）
+// 4. 右上角「部署」（Deploy）→「新增部署作業」（New deployment）
+//    → 選擇類型「網頁應用程式」（Web app）
+//    → 「執行身份」（Execute as）選「我」（Me）
+//    → 「誰可以存取」（Who has access）選「所有人」（Anyone）
+//    → 按「部署」，第一次會要求你授權（因為程式要用你的身份呼叫外部網址）。
+// 5. 部署完成後會給你一個「網頁應用程式網址」（Web app URL），
+//    網址開頭是 https://script.google.com/macros/s/.../exec
+//    把這個網址拿給我，我會把它填進試算工具的程式碼裡。
+//    這個網址本身不是秘密，可以放在公開的 GitHub 程式碼裡沒問題。
+//
+// 【之後如果要換一支金鑰、或關掉這個功能】
+// 直接回到「腳本屬性」改掉 ANTHROPIC_API_KEY 的值，或整個刪除部署即可，
+// 不需要改 GitHub 上的任何程式碼。
+//
+// ============================================================
+
+// 全體使用者共用的每小時請求上限，只是最基本的止血機制，不是真正的防護。
+// 想調整就改這個數字即可。
+const MAX_REQUESTS_PER_HOUR = 10;
+
+function doPost(e) {
+  try {
+    if (!checkAndIncrementRateLimit_()) {
+      return jsonResponse_({
+        type: 'error',
+        error: { type: 'rate_limit_error', message: '目前使用量已達上限（每小時 ' + MAX_REQUESTS_PER_HOUR + ' 次，全體使用者共用），請稍後再試。' },
+      });
+    }
+
+    const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+    if (!apiKey) {
+      return jsonResponse_({
+        type: 'error',
+        error: { type: 'config_error', message: '後台尚未設定 ANTHROPIC_API_KEY，請到「專案設定→腳本屬性」設定金鑰。' },
+      });
+    }
+
+    const payload = JSON.parse(e.postData.contents);
+
+    const response = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true,
+    });
+
+    // 把 Anthropic 回應的內容原封不動轉交回去，前端邏輯不用改。
+    return ContentService.createTextOutput(response.getContentText()).setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return jsonResponse_({
+      type: 'error',
+      error: { type: 'proxy_error', message: '代理伺服器發生錯誤：' + err.message },
+    });
+  }
+}
+
+function checkAndIncrementRateLimit_() {
+  const cache = CacheService.getScriptCache();
+  const bucketKey = 'req_count_' + Math.floor(Date.now() / (60 * 60 * 1000)); // 以每小時分桶計數
+  const current = Number(cache.get(bucketKey) || '0');
+  if (current >= MAX_REQUESTS_PER_HOUR) return false;
+  cache.put(bucketKey, String(current + 1), 3600);
+  return true;
+}
+
+function jsonResponse_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
