@@ -68,6 +68,7 @@
   table.trip-table th { color:#888; font-weight:normal; font-size:0.8rem; }
   table.trip-table input[type=text] { width:100%; min-width:80px; padding:4px 6px; font-size:0.85rem; transition:background .15s, border-color .15s; }
   table.trip-table input[type=text].port-home { background:#e8f5e9; border-color:#a5d6a7; color:#2e7d32; font-weight:bold; }
+  table.trip-table input[type=text].port-excluded { background:#fdecea; border-color:#f4511e; color:#c62828; font-weight:bold; }
   .trip-days-cell { color:#1565c0; font-weight:bold; }
   tr.trip-row-uncertain { background:#fff8e1; }
   tr.trip-row-uncertain input[type=text]:not(.port-home) { border-color:#ffca28; }
@@ -999,12 +1000,14 @@ function addTripRow(row) {
   recalcRowDays();
 }
 
-// 港口欄位若能自動比對為僑居國，直接把該欄位標色，方便一眼看出哪些城市屬於僑居地
+// 港口欄位若能自動比對為僑居國，直接把該欄位標色，方便一眼看出哪些城市屬於僑居地；
+// 中國大陸／港澳的城市或機場則標紅色，方便一眼看出哪幾筆會被視為境外天數計算的地雷區。
 function colorizePortInput(input, homeCountryRaw) {
   const hc = normalizeCountry(homeCountryRaw || '');
   const c = guessCountry(input.value);
   const match = !!(hc && c && normalizeCountry(c) === hc);
   input.classList.toggle('port-home', match);
+  input.classList.toggle('port-excluded', suggestExcluded(input.value));
 }
 
 function setHomeTag(homeTagEl, v) {
