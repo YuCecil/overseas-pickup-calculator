@@ -1016,7 +1016,7 @@ function setHomeTag(homeTagEl, v) {
   homeTagEl.className = 'tag c-home-tag ' + (v ? 'in' : 'out');
 }
 
-function redetectHome() {
+function redetectHome(silent) {
   const homeCountry = document.getElementById('f-homecountry').value;
   let changed = 0;
   tbody.querySelectorAll('tr').forEach(tr => {
@@ -1031,7 +1031,36 @@ function redetectHome() {
     if ((homeTag.dataset.home === 'true') !== next) changed++;
     setHomeTag(homeTag, next);
   });
-  showStatus(homeCountry ? `已依僑居國「${homeCountry}」重新判斷，共更新 ${changed} 筆「是否為僑居地」標籤。` : '請先在上方填寫僑居國，才能自動判斷。', homeCountry ? undefined : 'warn');
+  if (!silent) {
+    showStatus(homeCountry ? `已依僑居國「${homeCountry}」重新判斷，共更新 ${changed} 筆「是否為僑居地」標籤。` : '請先在上方填寫僑居國，才能自動判斷。', homeCountry ? undefined : 'warn');
+  }
+}
+
+// 匯入行程後，如果使用者還沒自己填僑居地，依目前表格裡所有港口出現的次數，
+// 猜測最可能的僑居地國家並自動填入（排除中港澳城市，那些是轉機/不算僑居地的雜訊）。
+// 回傳猜到的國家名稱；使用者已自己填過、或猜不出來則回傳 null，呼叫端據此決定要不要在
+// 狀態訊息裡告知使用者「這是系統自動猜的」。
+function guessAndFillHomeCountry() {
+  const hcField = document.getElementById('f-homecountry');
+  if (hcField.value.trim()) return null; // 使用者已自己填過，不要覆蓋
+
+  const countryCounts = {};
+  tbody.querySelectorAll('tr').forEach(tr => {
+    [tr.querySelector('.c-departPort').value, tr.querySelector('.c-returnPort').value].forEach(port => {
+      if (!port || suggestExcluded(port)) return; // 排除中港澳
+      const country = normalizeCountry(guessCountry(port) || '');
+      if (!country) return;
+      countryCounts[country] = (countryCounts[country] || 0) + 1;
+    });
+  });
+
+  const sorted = Object.entries(countryCounts).sort((a, b) => b[1] - a[1]);
+  if (sorted.length === 0) return null;
+
+  const guessed = sorted[0][0];
+  hcField.value = guessed;
+  redetectHome(true); // 靜音模式：不要蓋掉呼叫端接下來要顯示的匯入結果訊息
+  return guessed;
 }
 
 function recalcRowDays() {
@@ -1073,8 +1102,12 @@ document.getElementById('parse-paste-btn').addEventListener('click', () => {
     addTripRow({ depart, departPort, return: ret, returnPort, givenDays });
     added++;
   }
-  if (added === 0) showStatus('未能解析出任何行程資料，請確認格式為「出境日期、出境港口、入境日期、入境港口、（居住國外天數）」以 Tab 分隔。', 'error');
-  else showStatus(`已解析並加入 ${added} 筆行程，「計入／不計入」已依居住國外天數欄位自動判斷，如需更正可點擊該標籤。`);
+  if (added === 0) {
+    showStatus('未能解析出任何行程資料，請確認格式為「出境日期、出境港口、入境日期、入境港口、（居住國外天數）」以 Tab 分隔。', 'error');
+  } else {
+    const guessedCountry = guessAndFillHomeCountry();
+    showStatus(`已解析並加入 ${added} 筆行程，「計入／不計入」已依居住國外天數欄位自動判斷，如需更正可點擊該標籤。${guessedCountry ? `系統已依港口出現次數自動推測僑居地為「${guessedCountry}」。` : ''}`, guessedCountry ? 'warn' : undefined);
+  }
 });
 
 document.getElementById('file-input').addEventListener('change', e => {
@@ -1112,7 +1145,8 @@ document.getElementById('file-input').addEventListener('change', e => {
         addTripRow({ depart: row[0], departPort: row[1], return: row[2], returnPort: row[3], givenDays: row[4] });
         added++;
       }
-      showStatus(`已匯入 ${added} 筆出入境紀錄${name?`（${name}）`:''}，「計入／不計入」已依檔案原有的「居住國外天數」欄位自動判斷，按「開始試算」即可。`);
+      const guessedCountry = guessAndFillHomeCountry();
+      showStatus(`已匯入 ${added} 筆出入境紀錄${name?`（${name}）`:''}，「計入／不計入」已依檔案原有的「居住國外天數」欄位自動判斷，按「開始試算」即可。${guessedCountry ? `系統已依港口出現次數自動推測僑居地為「${guessedCountry}」。` : ''}`, guessedCountry ? 'warn' : undefined);
     } catch (err) {
       showStatus('讀取檔案失敗：' + err.message, 'error');
     }
@@ -1305,13 +1339,16 @@ function importOcrResult(text) {
     if (row.uncertain) flagged++;
   }
 
+  const guessedCountry = added > 0 ? guessAndFillHomeCountry() : null;
+
   const notes = [];
   if (boundary) notes.push(`其中 ${boundary} 筆只有入境、沒有出境日期（常見於在國外出生的最早一筆紀錄），已先只填入入境資料，天數暫不列入計算，請自行判斷後手動補上出境日期`);
   if (skipped) notes.push(`另有 ${skipped} 列出境、入境日期都看不出來已略過`);
   if (flagged) notes.push(`其中 ${flagged} 筆 AI 標記為字跡不確定，請特別核對原文件`);
+  if (guessedCountry) notes.push(`系統已依港口出現次數自動推測僑居地為「${guessedCountry}」`);
   showOcrStatus(
     `已匯入 ${added} 筆行程${notes.length ? '；' + notes.join('；') : ''}。AI 辨識僅供參考，請務必核對原始文件後再使用。`,
-    (skipped || flagged || boundary) ? 'warn' : undefined
+    (skipped || flagged || boundary || guessedCountry) ? 'warn' : undefined
   );
 }
 
