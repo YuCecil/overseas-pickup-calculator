@@ -61,8 +61,6 @@
   .tab-panel { display:none; }
   .tab-panel.active { display:block; }
 
-  textarea#paste-area { width:100%; height:110px; resize:vertical; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size:0.85rem; }
-
   table.trip-table { width:100%; border-collapse:collapse; margin-top:10px; font-size:0.88rem; }
   table.trip-table th, table.trip-table td { border-bottom:1px solid #eee; padding:6px 6px; text-align:center; }
   table.trip-table th { color:#888; font-weight:normal; font-size:0.8rem; }
@@ -168,7 +166,6 @@
     <div class="input-tabs">
       <div class="tab-btn active" data-tab="ocr">上傳照片／掃描檔（AI 辨識）</div>
       <div class="tab-btn" data-tab="upload">上傳 Excel 檔</div>
-      <div class="tab-btn" data-tab="paste">貼上表格</div>
     </div>
     <div class="tab-panel active" id="tab-ocr">
       <div class="field-row" style="margin-top:0;">
@@ -179,11 +176,6 @@
     </div>
     <div class="tab-panel" id="tab-upload">
       <input type="file" id="file-input" accept=".xlsx,.xls">
-    </div>
-    <div class="tab-panel" id="tab-paste">
-      <textarea id="paste-area" placeholder="出境日期  出境港口  入境日期  入境港口  居住國外天數
-2024/07/31&#9;菲律賓&#9;2024/12/09&#9;多倫多&#9;132"></textarea>
-      <div style="margin-top:8px;"><button class="btn btn-light" id="parse-paste-btn">解析貼上內容</button></div>
     </div>
 
     <table class="trip-table" id="trip-table">
@@ -1089,27 +1081,6 @@ function recalcRowDays() {
 document.getElementById('add-row-btn').addEventListener('click', () => addTripRow());
 document.getElementById('clear-rows-btn').addEventListener('click', () => { tbody.innerHTML = ''; showStatus('已清空所有行程列。'); });
 
-document.getElementById('parse-paste-btn').addEventListener('click', () => {
-  const text = document.getElementById('paste-area').value.trim();
-  if (!text) return;
-  const lines = text.split(/\r?\n/).filter(l => l.trim());
-  let added = 0;
-  for (const line of lines) {
-    const cols = line.split('\t').length > 1 ? line.split('\t') : line.split(',');
-    if (cols.length < 4) continue;
-    const [depart, departPort, ret, returnPort, givenDays] = cols.map(c => c.trim());
-    if (!parseYMD(depart)) continue; // 略過標題列等非日期資料
-    addTripRow({ depart, departPort, return: ret, returnPort, givenDays });
-    added++;
-  }
-  if (added === 0) {
-    showStatus('未能解析出任何行程資料，請確認格式為「出境日期、出境港口、入境日期、入境港口、（居住國外天數）」以 Tab 分隔。', 'error');
-  } else {
-    const guessedCountry = guessAndFillHomeCountry();
-    showStatus(`已解析並加入 ${added} 筆行程，「計入／不計入」已依居住國外天數欄位自動判斷，如需更正可點擊該標籤。${guessedCountry ? `系統已依港口出現次數自動推測僑居地為「${guessedCountry}」。` : ''}`, guessedCountry ? 'warn' : undefined);
-  }
-});
-
 document.getElementById('file-input').addEventListener('change', e => {
   const file = e.target.files[0];
   if (!file) return;
@@ -1284,7 +1255,7 @@ function importOcrResult(text) {
   // 注意：這裡不能對整行做 trim()，會把「沒有出境日期」那一列最前面用來標示空欄位的
   // Tab 字元也一起清掉，導致該列變成只有3欄、被誤判成格式不完整而略過。
   const lines = text.split(/\r?\n/).filter(l => l.trim());
-  if (lines.length === 0) { showOcrStatus('AI 沒有回傳可用內容，請重試或改用「貼上表格」。', 'error'); return; }
+  if (lines.length === 0) { showOcrStatus('AI 沒有回傳可用內容，請重試或換一張更清楚的圖片。', 'error'); return; }
 
   let startIdx = 0;
   const first = lines[0].trim();
@@ -1325,6 +1296,10 @@ function importOcrResult(text) {
     });
   }
   parsedRows.sort((a, b) => a.sortKey - b.sortKey);
+
+  // 跟「上傳 Excel 檔」的行為統一：只要這次辨識出至少一筆可用資料，就清空整張表重來，
+  // 不要跟表格裡原本的舊資料混在一起。完全辨識不出東西時則不清空，保留原有資料。
+  if (parsedRows.length > 0) tbody.innerHTML = '';
 
   let added = 0, flagged = 0, boundary = 0;
   for (const row of parsedRows) {
