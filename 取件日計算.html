@@ -900,7 +900,7 @@
   // 案件追蹤清單（資料存在 Google 試算表，透過 Apps Script API 讀寫）
   (function() {
     const API_URL    = 'https://script.google.com/macros/s/AKfycbwEBbCdfSb057FFDVq9N4AKBk_f6Yn8_4B6l3IwHwZR8jIcmq8dY61wVw37t-DPJPzU/exec';
-    const ACCESS_KEY = 'bd7244df81ca37019fbd9a1dfd5e98be';
+    const ACCESS_KEY = '5bb447c5581c7c92dffa17037553113731137adbb7d1c8f048dde04d7eacda30';
 
     const nameInput     = document.getElementById('track-name');
     const methodInput   = document.getElementById('track-method');
@@ -930,11 +930,8 @@
 
     async function api(action, payload) {
       const key = ACCESS_KEY;
-      if (action === 'list') {
-        const url = `${API_URL}?action=list&key=${encodeURIComponent(key)}`;
-        const res = await fetch(url);
-        return res.json();
-      }
+      // 一律用 POST、金鑰放在 body 裡，不要放在網址的查詢字串裡
+      // （網址會留在瀏覽器歷史紀錄、伺服器存取記錄裡，比較容易外流）。
       const res = await fetch(API_URL, {
         method: 'POST',
         body: JSON.stringify(Object.assign({ action, key }, payload))
@@ -948,9 +945,15 @@
     }
 
     function escapeHtml(str) {
-      const div = document.createElement('div');
-      div.textContent = str;
-      return div.innerHTML;
+      // 這裡的輸出會被塞進 value="..." 這種 HTML 屬性裡，用 div.textContent 只會處理
+      // < > & 這三個字元，雙引號、單引號不會被跳脫；使用者打的備註只要有一個雙引號，
+      // 屬性值就會被提前截斷，甚至能塞入額外的 HTML 屬性，所以要手動把引號也換成實體字元。
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     }
 
     function rowHtml(item, today) {
@@ -1053,6 +1056,9 @@
       });
       container.querySelectorAll('.track-del-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+          const target = cases.find(x => x.id === btn.dataset.id);
+          const label = target && target.name ? `「${target.name}」` : '這筆';
+          if (!confirm(`確定要刪除${label}這筆案件嗎？刪除後無法復原。`)) return;
           const idx = cases.findIndex(x => x.id === btn.dataset.id);
           const removed = idx > -1 ? cases.splice(idx, 1)[0] : null;
           render();

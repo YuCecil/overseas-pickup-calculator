@@ -288,6 +288,17 @@ function fmtYMD(d) {
   if (!d) return '';
   return `${d.getUTCFullYear()}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${String(d.getUTCDate()).padStart(2, '0')}`;
 }
+// 港口、姓名等文字都可能來自 Excel／AI 辨識，內容不受控制；直接塞進 innerHTML 或
+// value="..." 屬性裡，遇到 < > & " 這些字元會被當成 HTML 解析、資料被截斷甚至跑版，
+// 所以所有使用者/檔案來源的文字進 HTML 之前都要先過這個函式。
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function addDays(d, n) { const r = new Date(d); r.setUTCDate(r.getUTCDate() + n); return r; }
 function addMonths(d, n) {
   // 直接用 setUTCMonth 對月底日期（例如8/31加6個月）會溢位到下個月（變成3/3而非2/28/29），
@@ -947,9 +958,9 @@ function addTripRow(row) {
   const isHome = row.isHome !== undefined ? row.isHome : (counted && deriveIsHome(row.departPort, row.returnPort, homeCountry));
   tr.innerHTML = `
     <td><input type="date" class="c-depart" value="${toInputDate(row.depart)||''}"></td>
-    <td><input type="text" class="c-departPort" value="${row.departPort||''}"></td>
+    <td><input type="text" class="c-departPort" value="${escapeHtml(row.departPort||'')}"></td>
     <td><input type="date" class="c-return" value="${toInputDate(row.return)||''}"></td>
-    <td><input type="text" class="c-returnPort" value="${row.returnPort||''}"></td>
+    <td><input type="text" class="c-returnPort" value="${escapeHtml(row.returnPort||'')}"></td>
     <td><span class="tag c-counted-tag ${counted?'in':'out'}" style="cursor:pointer;" data-counted="${counted}">${counted?'計入':'不計入'}</span></td>
     <td><span class="tag c-home-tag ${isHome?'in':'out'}" style="cursor:pointer;" data-home="${isHome}">${isHome?'僑居地':'其他國家'}</span></td>
     <td class="trip-days-cell c-days">－</td>
@@ -1079,7 +1090,12 @@ function recalcRowDays() {
 }
 
 document.getElementById('add-row-btn').addEventListener('click', () => addTripRow());
-document.getElementById('clear-rows-btn').addEventListener('click', () => { tbody.innerHTML = ''; showStatus('已清空所有行程列。'); });
+document.getElementById('clear-rows-btn').addEventListener('click', () => {
+  if (tbody.children.length === 0) return;
+  if (!confirm(`確定要清空目前 ${tbody.children.length} 列行程嗎？清空後無法復原。`)) return;
+  tbody.innerHTML = '';
+  showStatus('已清空所有行程列。');
+});
 
 document.getElementById('file-input').addEventListener('change', e => {
   const file = e.target.files[0];
@@ -1140,9 +1156,13 @@ function fileToBase64(file) {
 
 // AI 辨識時會依提示詞連同機場英文代號一起輸出（例如「多倫多YYZ」，方便比對原文件），
 // 但英文代號會干擾「是否為僑居地」的自動判斷，匯入前先去掉只留中文地名。
+// 只有同時含中文字的字串才會嘗試去掉結尾的英文代號——如果整個地名本來就是純英文
+// （例如原文件寫的是「TOKYO」「Los Angeles」「SFO」），沒有辦法分辨結尾幾個字母是
+// 機場代號還是地名本身的一部分，這時候寧可不處理、原樣保留，避免把純英文地名越改越短。
 function stripAirportCode(port) {
   if (!port) return port;
-  return port.replace(/\s*\(?[A-Za-z]{2,4}\)?\s*$/, '').trim();
+  if (!/[一-鿿]/.test(port)) return port;
+  return port.replace(/\s*\(?[A-Z]{2,4}\)?\s*$/, '').trim();
 }
 
 function showOcrStatus(msg, type) {
@@ -1366,16 +1386,16 @@ function badge(el, pass, textPass, textFail, textUnknown) {
 function rescueInstruction(c) {
   const notes = [];
   if (c.kind === 'not_home') {
-    if (c.departMismatch) notes.push(`請補證明「${c.departPort}」僅為轉機、實際仍在僑居地`);
-    if (c.returnMismatch) notes.push(`請補證明「${c.returnPort}」僅為轉機、實際仍在僑居地`);
+    if (c.departMismatch) notes.push(`請補證明「${escapeHtml(c.departPort)}」僅為轉機、實際仍在僑居地`);
+    if (c.returnMismatch) notes.push(`請補證明「${escapeHtml(c.returnPort)}」僅為轉機、實際仍在僑居地`);
     if (notes.length === 0) notes.push('請補證明實際全程在僑居地');
     return notes.join('；');
   }
   if (c.departExcluded) {
-    notes.push(`離開臺灣飛抵「${c.departPort}」後，請補實際前往僑居地／第三國的後續機票或入出境證明`);
+    notes.push(`離開臺灣飛抵「${escapeHtml(c.departPort)}」後，請補實際前往僑居地／第三國的後續機票或入出境證明`);
   }
   if (c.returnExcluded) {
-    notes.push(`返臺前，請補從實際居住地飛抵「${c.returnPort}」之前的機票或入出境證明`);
+    notes.push(`返臺前，請補從實際居住地飛抵「${escapeHtml(c.returnPort)}」之前的機票或入出境證明`);
   }
   if (notes.length === 0) notes.push('請補其他段機票或入出境證明');
   return notes.join('；');
@@ -1384,8 +1404,8 @@ function rescueInstruction(c) {
 function rescueRowsTable(list) {
   const rows = list.map(c => `
     <tr>
-      <td>${fmtYMD(c.depart)}</td><td>${c.departPort}</td>
-      <td>${c.return ? fmtYMD(c.return) : '（進行中）'}</td><td>${c.returnPort}</td>
+      <td>${fmtYMD(c.depart)}</td><td>${escapeHtml(c.departPort)}</td>
+      <td>${c.return ? fmtYMD(c.return) : '（進行中）'}</td><td>${escapeHtml(c.returnPort)}</td>
       <td class="trip-days-cell">${c.days} 日</td>
       <td style="text-align:left; font-size:0.82rem;">${rescueInstruction(c)}</td>
     </tr>`).join('');
@@ -1541,8 +1561,8 @@ function renderResults(r) {
     if (t.invalid) {
       tr.style.background = '#fdecea';
       tr.innerHTML = `
-        <td>${fmtYMD(t.depart)}</td><td>${t.departPort}</td>
-        <td>${t.return ? fmtYMD(t.return) : '（進行中）'}</td><td>${t.returnPort}</td>
+        <td>${fmtYMD(t.depart)}</td><td>${escapeHtml(t.departPort)}</td>
+        <td>${t.return ? fmtYMD(t.return) : '（進行中）'}</td><td>${escapeHtml(t.returnPort)}</td>
         <td colspan="3" style="color:#c62828; font-weight:bold;">日期顛倒（入境早於出境），已排除不計算</td>
       `;
       auditBody.appendChild(tr);
@@ -1550,8 +1570,8 @@ function renderResults(r) {
     }
     const days = t.counted ? diffDaysInclusive(t.depart, t.return || parseYMD(document.getElementById('f-query').value.replaceAll('-','/'))) : 0;
     tr.innerHTML = `
-      <td>${fmtYMD(t.depart)}</td><td>${t.departPort}</td>
-      <td>${t.return ? fmtYMD(t.return) : '（進行中）'}</td><td>${t.returnPort}</td>
+      <td>${fmtYMD(t.depart)}</td><td>${escapeHtml(t.departPort)}</td>
+      <td>${t.return ? fmtYMD(t.return) : '（進行中）'}</td><td>${escapeHtml(t.returnPort)}</td>
       <td><span class="tag ${t.counted?'in':'out'}">${t.counted?'計入':'不計入'}</span></td>
       <td><span class="tag ${t.isHome?'in':'out'}">${t.isHome?'僑居地':'其他國家'}</span></td>
       <td>${t.counted ? days + ' 日' : '－'}</td>

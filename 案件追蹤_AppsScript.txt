@@ -1,0 +1,104 @@
+const SHEET_NAME = 'cases';
+const ACCESS_KEY = '5bb447c5581c7c92dffa17037553113731137adbb7d1c8f048dde04d7eacda30';
+
+function doGet(e) {
+  return handle(e);
+}
+
+function doPost(e) {
+  return handle(e);
+}
+
+function handle(e) {
+  try {
+    const params = (e && e.parameter) || {};
+    let body = {};
+    if (e && e.postData && e.postData.contents) {
+      try { body = JSON.parse(e.postData.contents); } catch (err) { body = {}; }
+    }
+    const key = params.key || body.key;
+    if (key !== ACCESS_KEY) {
+      return json({ error: 'unauthorized' });
+    }
+    const action = params.action || body.action || 'list';
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_NAME);
+
+    if (action === 'list') {
+      return json({ cases: listCases(sheet) });
+    } else if (action === 'add') {
+      return json({ case: addCase(sheet, body) });
+    } else if (action === 'update') {
+      return json({ ok: updateCase(sheet, body) });
+    } else if (action === 'delete') {
+      return json({ ok: deleteCase(sheet, body) });
+    }
+    return json({ error: 'unknown action' });
+  } catch (err) {
+    return json({ error: String(err) });
+  }
+}
+
+function listCases(sheet) {
+  const values = sheet.getDataRange().getValues();
+  const rows = values.slice(1);
+  return rows
+    .filter(function (r) { return r[0]; })
+    .map(function (r) {
+      return {
+        id: String(r[0]),
+        name: r[1],
+        acceptDate: fmtDate(r[2]),
+        received: r[3] === true || r[3] === 'TRUE',
+        createdAt: r[4],
+        note: r[5] || '',
+        method: r[6] || '自取',
+        personReceived: r[7] === true || r[7] === 'TRUE'
+      };
+    });
+}
+
+function addCase(sheet, body) {
+  const id = Utilities.getUuid();
+  const now = new Date().toISOString();
+  const name = body.name || '';
+  const acceptDate = body.acceptDate || '';
+  const method = body.method === '郵寄' ? '郵寄' : '自取';
+  sheet.appendRow([id, name, acceptDate, false, now, '', method, false]);
+  return { id: id, name: name, acceptDate: acceptDate, received: false, createdAt: now, note: '', method: method, personReceived: false };
+}
+
+function updateCase(sheet, body) {
+  const row = findRow(sheet, body.id);
+  if (!row) return false;
+  if (body.received !== undefined) sheet.getRange(row, 4).setValue(!!body.received);
+  if (body.note !== undefined) sheet.getRange(row, 6).setValue(String(body.note));
+  if (body.personReceived !== undefined) sheet.getRange(row, 8).setValue(!!body.personReceived);
+  return true;
+}
+
+function deleteCase(sheet, body) {
+  const row = findRow(sheet, body.id);
+  if (!row) return false;
+  sheet.deleteRow(row);
+  return true;
+}
+
+function findRow(sheet, id) {
+  const values = sheet.getDataRange().getValues();
+  for (let i = 1; i < values.length; i++) {
+    if (String(values[i][0]) === String(id)) return i + 1;
+  }
+  return null;
+}
+
+function fmtDate(v) {
+  if (Object.prototype.toString.call(v) === '[object Date]') {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return String(v);
+}
+
+function json(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
