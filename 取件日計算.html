@@ -336,6 +336,17 @@
     .track-empty { color: #bbb; font-size: 0.95rem; padding: 6px 0 4px; }
     .track-status { color: #999; font-size: 0.9rem; padding: 6px 0 4px; }
     .track-status.error { color: #c62828; }
+    .track-retry {
+      margin: 0 0 8px;
+      padding: 4px 12px;
+      font-size: 0.85rem;
+      color: #1565c0;
+      background: #fff;
+      border: 1px solid #1565c0;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .track-retry:hover { background: #e3f2fd; }
     .track-archive-toggle {
       margin-top: 14px;
       font-size: 0.85rem;
@@ -550,6 +561,7 @@
       <button id="track-add-btn">新增</button>
     </div>
     <div id="track-status" class="track-status" style="display:none;"></div>
+    <button type="button" id="track-retry" class="track-retry" style="display:none;">重新讀取</button>
     <div id="track-empty" class="track-empty" style="display:none;">目前沒有追蹤中的案件</div>
     <div class="track-table-wrap">
       <table id="track-table" class="track-table" style="display:none;">
@@ -910,6 +922,7 @@
     const table         = document.getElementById('track-table');
     const empty         = document.getElementById('track-empty');
     const statusEl      = document.getElementById('track-status');
+    const retryBtn      = document.getElementById('track-retry');
     const banner        = document.getElementById('alert-banner');
     const alertCount    = document.getElementById('alert-count');
     const archiveToggle = document.getElementById('track-archive-toggle');
@@ -928,15 +941,54 @@
       statusEl.style.display = '';
     }
 
-    async function api(action, payload) {
+    // 失敗後自動重試的間隔（毫秒）。機關網路的 proxy 偶爾會把 POST body 弄丟或改寫，
+    // Google 試算表那端也會偶發逾時，這兩種都是「再試一次就會好」的暫時性問題；
+    // 沒有重試的話，一次抖動就會讓使用者看到錯誤畫面，只能自己重新整理。
+    const RETRY_DELAYS = [1000, 3000];
+
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    // onRetry(第幾次重試) 會在每次重試前被呼叫，讓呼叫端可以更新畫面上的狀態文字。
+    async function api(action, payload, onRetry) {
       const key = ACCESS_KEY;
-      // 一律用 POST、金鑰放在 body 裡，不要放在網址的查詢字串裡
-      // （網址會留在瀏覽器歷史紀錄、伺服器存取記錄裡，比較容易外流）。
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        body: JSON.stringify(Object.assign({ action, key }, payload))
-      });
-      return res.json();
+      // 「新增」不是冪等操作：請求有可能已經送達、案件也寫進試算表了，只是回應在半路
+      // 遺失，這時候重試會多出一筆重複案件。所以連線層失敗時不重試「新增」，
+      // 但後端有明確回錯誤時仍然可以重試（見下方說明）。
+      const retryOnConnectionError = action !== 'add';
+      let lastErr = null;
+
+      for (let attempt = 0; attempt <= RETRY_DELAYS.length; attempt++) {
+        if (attempt > 0) {
+          if (onRetry) onRetry(attempt);
+          await sleep(RETRY_DELAYS[attempt - 1]);
+        }
+
+        let data;
+        try {
+          // 一律用 POST、金鑰放在 body 裡，不要放在網址的查詢字串裡
+          // （網址會留在瀏覽器歷史紀錄、伺服器存取記錄裡，比較容易外流）。
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify(Object.assign({ action, key }, payload))
+          });
+          data = await res.json();
+        } catch (err) {
+          // 連不上，或 Google 回的根本不是 JSON（授權過期頁、proxy 攔截頁等）。
+          lastErr = err;
+          if (retryOnConnectionError) continue;
+          throw err;
+        }
+
+        // 後端有回應、但帶著 error。後端是「先檢查金鑰、才動資料」，所以走到這裡
+        // 代表試算表還沒被改過，任何 action 重試都是安全的——包含「新增」。
+        // 金鑰其實是對的、卻收到 unauthorized，正是 POST body 在半路遺失的徵兆。
+        if (data && data.error && attempt < RETRY_DELAYS.length) continue;
+        return data;
+      }
+
+      throw lastErr;
     }
 
     function fmtShort(dateStr) {
@@ -1123,16 +1175,24 @@
 
     async function load() {
       setStatus('讀取中…');
+      retryBtn.style.display = 'none';
       try {
-        const data = await api('list');
-        if (data.error) { setStatus('讀取失敗：' + data.error, true); return; }
+        const data = await api('list', null, n => setStatus(`讀取中…（重試第 ${n} 次）`));
+        if (data.error) {
+          setStatus('讀取失敗：' + data.error, true);
+          retryBtn.style.display = '';
+          return;
+        }
         cases = data.cases || [];
         setStatus('');
         render();
       } catch (err) {
         setStatus('無法連線到案件清單，請檢查網路連線', true);
+        retryBtn.style.display = '';
       }
     }
+
+    retryBtn.addEventListener('click', load);
 
     archiveToggle.addEventListener('click', () => {
       archiveOpen = !archiveOpen;
