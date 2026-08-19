@@ -295,7 +295,8 @@
       flex-wrap: wrap;
       margin: 14px 0 18px;
     }
-    .track-add-row input[type="text"] {
+    .track-add-row input[type="text"],
+    .track-add-row textarea {
       font-size: 1rem;
       font-family: inherit;
       border: 2px solid #d0d8e4;
@@ -306,7 +307,16 @@
       flex: 1;
       min-width: 160px;
     }
-    .track-add-row input[type="text"]:focus { border-color: #1e88e5; }
+    /* 姓名欄是 textarea（可一次輸入多人）：行高與內距對齊旁邊的單行欄位，
+       高度改由 JS 依內容自動長高，所以關掉手動拉把手與捲軸。 */
+    .track-add-row textarea {
+      line-height: 1.5;
+      resize: none;
+      overflow: hidden;
+      display: block;
+    }
+    .track-add-row input[type="text"]:focus,
+    .track-add-row textarea:focus { border-color: #1e88e5; }
     .track-add-row select {
       font-size: 1rem;
       font-family: inherit;
@@ -332,6 +342,7 @@
       transition: background 0.2s;
     }
     #track-add-btn:hover { background: #0d47a1; }
+    #track-add-btn:disabled { background: #90a4ae; cursor: default; }
 
     .track-empty { color: #bbb; font-size: 0.95rem; padding: 6px 0 4px; }
     .track-status { color: #999; font-size: 0.9rem; padding: 6px 0 4px; }
@@ -552,7 +563,7 @@
   <div class="track-box" id="track-box">
     <div class="info-box-label">案件追蹤清單<span class="track-hint">（受理日＋3個工作天仍未收件，會提醒聯繫台北）</span></div>
     <div class="track-add-row">
-      <input type="text" id="track-name" placeholder="姓名">
+      <textarea id="track-name" rows="1" placeholder="姓名（可一次多人，換行或逗號分隔）"></textarea>
       <select id="track-method">
         <option value="自取">自取</option>
         <option value="郵寄">郵寄</option>
@@ -1199,21 +1210,36 @@
       render();
     });
 
-    addBtn.addEventListener('click', () => {
-      if (!dateInput.value) return;
-      const name = nameInput.value.trim();
-      const method = methodInput.value;
-      const acceptDate = dateInput.value;
-      const tempId = 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    // 姓名欄一次可以輸入多人：換行、半形／全形逗號、頓號、分號都當成分隔符號。
+    // 同一批共用畫面上選的領件方式與受理日期（一批裡自取、郵寄混雜時分兩次新增）。
+    function parseNames(text) {
+      return text.split(/[\n,，、;；]+/).map(s => s.trim()).filter(Boolean);
+    }
 
-      cases.push({ id: tempId, name, method, acceptDate, received: false, personReceived: false, note: '', createdAt: new Date().toISOString() });
-      nameInput.value = '';
-      methodInput.value = '自取';
-      dateInput.value = getTaiwanToday();
-      setStatus('');
-      render();
+    function updateAddBtn() {
+      const n = parseNames(nameInput.value).length;
+      addBtn.textContent = n > 1 ? `新增 ${n} 人` : '新增';
+    }
 
-      api('add', { name, method, acceptDate })
+    // textarea 依內容自動長高，省得使用者自己拉；超過上限才出現捲軸。
+    function autoGrowName() {
+      nameInput.style.height = 'auto';
+      const max = 150;
+      nameInput.style.height = Math.min(nameInput.scrollHeight, max) + 'px';
+      nameInput.style.overflowY = nameInput.scrollHeight > max ? 'auto' : 'hidden';
+    }
+
+    nameInput.addEventListener('input', () => { autoGrowName(); updateAddBtn(); });
+    nameInput.addEventListener('keydown', e => {
+      // Enter 要留給換行（多人輸入用），Ctrl／⌘ + Enter 才是送出
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); addBtn.click(); }
+    });
+    autoGrowName();
+
+    // 送出一筆新增，並把畫面上的暫存列換成伺服器回傳的正式資料。失敗時 reject，
+    // 由呼叫端負責把那一列從畫面上收掉。
+    function submitAdd(tempId, name, method, acceptDate) {
+      return api('add', { name, method, acceptDate })
         .then(data => {
           if (data && data.error) throw new Error(data.error);
           const idx = cases.findIndex(x => x.id === tempId);
@@ -1250,13 +1276,60 @@
               if (selStart !== null) newInput.setSelectionRange(selStart, selStart);
             }
           }
-        })
-        .catch(() => {
-          const idx = cases.findIndex(x => x.id === tempId);
-          if (idx > -1) cases.splice(idx, 1);
-          setStatus('新增失敗，請檢查網路連線後再試', true);
-          render();
         });
+    }
+
+    addBtn.addEventListener('click', async () => {
+      if (!dateInput.value) return;
+      if (addBtn.disabled) return;
+      const method = methodInput.value;
+      const acceptDate = dateInput.value;
+      // 姓名可以留空（先佔一列、之後再補打），所以沒填任何名字時仍然新增一筆空白案件
+      const names = parseNames(nameInput.value);
+      const entries = (names.length ? names : ['']).map(name => ({
+        name,
+        tempId: 'tmp-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+      }));
+
+      const now = new Date().toISOString();
+      entries.forEach(entry => {
+        cases.push({ id: entry.tempId, name: entry.name, method, acceptDate, received: false, personReceived: false, note: '', createdAt: now });
+      });
+      nameInput.value = '';
+      methodInput.value = '自取';
+      dateInput.value = getTaiwanToday();
+      autoGrowName();
+      updateAddBtn();
+      setStatus('');
+      render();
+
+      // 逐筆送出，不要整批併發：後端是往同一張試算表 appendRow，併發送出容易互相
+      // 卡住或逾時；逐筆送也才知道是「哪幾筆」失敗，成功的那幾筆可以留在畫面上。
+      addBtn.disabled = true;
+      let failed = 0;
+      try {
+        for (let i = 0; i < entries.length; i++) {
+          if (entries.length > 1) setStatus(`新增中…（${i + 1}／${entries.length}）`);
+          try {
+            await submitAdd(entries[i].tempId, entries[i].name, method, acceptDate);
+          } catch (err) {
+            failed++;
+            const idx = cases.findIndex(x => x.id === entries[i].tempId);
+            if (idx > -1) cases.splice(idx, 1);
+            render();
+          }
+        }
+      } finally {
+        addBtn.disabled = false;
+      }
+
+      if (failed === entries.length) {
+        setStatus('新增失敗，請檢查網路連線後再試', true);
+      } else if (failed) {
+        setStatus(`有 ${failed} 筆新增失敗（已從清單移除），其餘 ${entries.length - failed} 筆新增成功，請重新輸入失敗的那幾筆`, true);
+      } else {
+        setStatus('');
+      }
     });
 
     load();
