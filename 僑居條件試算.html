@@ -1320,7 +1320,16 @@ function importOcrResult(text) {
   const parsedRows = [];
   let skipped = 0;
   for (let i = startIdx; i < lines.length; i++) {
-    const cols = lines[i].split('\t').map(c => c.trim());
+    let cols = lines[i].split('\t').map(c => c.trim());
+    // 文件上「沒有對應出境紀錄」那一格印的是一長串破折號，先一律當成空值。
+    cols = cols.map(c => /^[-\u2013\u2014\u2500_]+$/.test(c) ? '' : c);
+    // AI 對「空欄位要打幾個 Tab」很不穩定——同一份文件實測跑五次，那種只有入境、
+    // 沒有出境的邊界列出現過 3 欄、4 欄、5 欄三種寫法。欄數不對時下面的解構賦值
+    // 會把日期讀到錯的欄位、害整列被當成無效資料略過，所以先正規化回固定 4 欄。
+    // 只在開頭是空欄位時才增減，避免動到本來就填滿四欄的正常資料。
+    while (cols.length > 4 && cols[0] === '') cols.shift();
+    while (cols.length < 4 && cols[0] === '') cols.unshift('');
+    if (cols.length > 4) cols.length = 4;
     if (cols.length < 4) { skipped++; continue; }
     const [departRaw, departPortRaw, returnRaw, returnPortRaw] = cols;
     const departDate = parseYMD(departRaw);
