@@ -1,29 +1,37 @@
 // ============================================================
 // 用途：當「僑居條件試算工具」網頁上的 AI 辨識功能的代理伺服器。
-// 瀏覽器不會直接呼叫 Anthropic，而是呼叫這支 Apps Script，
-// 由這支程式代替瀏覽器去呼叫 Anthropic——這樣 Anthropic API Key
+// 瀏覽器不會直接呼叫 OpenAI，而是呼叫這支 Apps Script，
+// 由這支程式代替瀏覽器去呼叫 OpenAI——這樣 OpenAI API Key
 // 就只會存在這支程式的私人設定裡，不會出現在 GitHub 上的任何程式碼。
+//
+// （原本這支是接 Anthropic Claude，2026/08 改接 OpenAI。前端送過來的
+//   payload 已經是 OpenAI Responses API 的格式，這裡只負責加上金鑰轉送。）
 // ============================================================
 //
 // 【部署步驟】
 // 1. 到 https://script.google.com 建立一個新專案（New project）。
+//    ※ 如果是沿用原本那支已經在用的專案，直接把內容整個換掉即可，網址不用換。
 // 2. 把整個檔案的內容貼進去，取代預設的 Code.gs。
 // 3. 左側選單點「專案設定」（齒輪圖示）→ 找到「腳本屬性」（Script Properties）
-//    → 新增屬性：屬性名稱填 ANTHROPIC_API_KEY，值填你的 Anthropic API Key，按存檔。
-//    （建議去 Anthropic 後台另外申請一支「專用」金鑰給這個工具用，並設定用量上限，
-//      不要用你自己主要在用的那支。）
+//    → 新增屬性：屬性名稱填 OPENAI_API_KEY，值填你的 OpenAI API Key
+//      （在 https://platform.openai.com/api-keys 建立，開頭是 sk-...），按存檔。
+//    （建議在 OpenAI 後台另外申請一支「專用」金鑰給這個工具用，並到
+//      「Settings → Limits」設定每月用量上限，不要用你自己主要在用的那支。）
+//    ※ 原本的 ANTHROPIC_API_KEY 屬性可以直接刪掉。
 // 4. 右上角「部署」（Deploy）→「新增部署作業」（New deployment）
 //    → 選擇類型「網頁應用程式」（Web app）
 //    → 「執行身份」（Execute as）選「我」（Me）
 //    → 「誰可以存取」（Who has access）選「所有人」（Anyone）
 //    → 按「部署」，第一次會要求你授權（因為程式要用你的身份呼叫外部網址）。
+//    ※ 沿用舊專案的話：要走「管理部署作業」→ 編輯（鉛筆）→ 版本選「新增版本」→ 部署，
+//      否則對外的 /exec 網址還是跑舊程式碼。
 // 5. 部署完成後會給你一個「網頁應用程式網址」（Web app URL），
 //    網址開頭是 https://script.google.com/macros/s/.../exec
-//    把這個網址拿給我，我會把它填進試算工具的程式碼裡。
+//    把這個網址填進 `僑居條件試算.html` 裡的 OCR_PROXY_URL 常數。
 //    這個網址本身不是秘密，可以放在公開的 GitHub 程式碼裡沒問題。
 //
 // 【之後如果要換一支金鑰、或關掉這個功能】
-// 直接回到「腳本屬性」改掉 ANTHROPIC_API_KEY 的值，或整個刪除部署即可，
+// 直接回到「腳本屬性」改掉 OPENAI_API_KEY 的值，或整個刪除部署即可，
 // 不需要改 GitHub 上的任何程式碼。
 //
 // ============================================================
@@ -36,37 +44,35 @@ function doPost(e) {
   try {
     if (!checkAndIncrementRateLimit_()) {
       return jsonResponse_({
-        type: 'error',
         error: { type: 'rate_limit_error', message: '目前使用量已達上限（每小時 ' + MAX_REQUESTS_PER_HOUR + ' 次，全體使用者共用），請稍後再試。' },
       });
     }
 
-    const apiKey = PropertiesService.getScriptProperties().getProperty('ANTHROPIC_API_KEY');
+    const apiKey = PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY');
     if (!apiKey) {
       return jsonResponse_({
-        type: 'error',
-        error: { type: 'config_error', message: '後台尚未設定 ANTHROPIC_API_KEY，請到「專案設定→腳本屬性」設定金鑰。' },
+        error: { type: 'config_error', message: '後台尚未設定 OPENAI_API_KEY，請到「專案設定→腳本屬性」設定金鑰。' },
       });
     }
 
     const payload = JSON.parse(e.postData.contents);
 
-    const response = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+    const response = UrlFetchApp.fetch('https://api.openai.com/v1/responses', {
       method: 'post',
       contentType: 'application/json',
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': 'Bearer ' + apiKey,
       },
       payload: JSON.stringify(payload),
       muteHttpExceptions: true,
     });
 
-    // 把 Anthropic 回應的內容原封不動轉交回去，前端邏輯不用改。
+    // 把 OpenAI 回應的內容原封不動轉交回去，由前端負責解析。
+    // OpenAI 出錯時回傳的內容本來就長成 { "error": { "message": ... } }，
+    // 跟前端的錯誤判斷方式一致，不需要另外包裝。
     return ContentService.createTextOutput(response.getContentText()).setMimeType(ContentService.MimeType.JSON);
   } catch (err) {
     return jsonResponse_({
-      type: 'error',
       error: { type: 'proxy_error', message: '代理伺服器發生錯誤：' + err.message },
     });
   }

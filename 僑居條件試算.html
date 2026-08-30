@@ -1141,9 +1141,16 @@ document.getElementById('file-input').addEventListener('change', e => {
   reader.readAsArrayBuffer(file);
 });
 
-/* ============ AI 圖片辨識匯入（透過 Apps Script 代理伺服器呼叫 Claude Vision API） ============ */
+/* ============ AI 圖片辨識匯入（透過 Apps Script 代理伺服器呼叫 OpenAI Responses API） ============ */
 // 金鑰藏在 Apps Script 後台的「腳本屬性」，這裡只是代理伺服器的網址，公開也沒關係。
 const OCR_PROXY_URL = 'https://script.google.com/macros/s/AKfycbwUg66VCPwdfoA_Q3LzmU5DSvhM73HylcgzSU8FbDMSmrT9ic-NOkTGWoVj4EceSgpXsg/exec';
+
+// 要換模型只改這一行就好（代理伺服器不用重新部署，因為模型名稱是前端送過去的）。
+// gpt-5.6 三個變體（sol／terra／luna）能力規格相同（都吃圖片、1.05M context），
+// 差別只在推理強度與價格；terra 是官方定位的「平衡預設款」。
+// 想再省錢可以改成 'gpt-5.6-luna'（便宜約 10 倍），但這份文件的日期常被紅色印章蓋住，
+// 降級前務必拿幾份實際掃描檔比對過辨識結果再換。
+const OCR_MODEL = 'gpt-5.6-terra';
 
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
@@ -1201,7 +1208,7 @@ document.getElementById('ocr-run-btn').addEventListener('click', async () => {
   for (const file of files) {
     if (!isPdfFile(file) && !isHeicFile(file) && file.type && !SUPPORTED_IMAGE_TYPES.includes(file.type)) {
       showOcrStatus(
-        `「${file.name}」是 ${file.type} 格式，Claude 不支援（只支援 JPG／PNG／GIF／WEBP／PDF／HEIC）。請改用截圖或轉存為 JPG 後再上傳。`,
+        `「${file.name}」是 ${file.type} 格式，AI 辨識不支援（只支援 JPG／PNG／GIF／WEBP／PDF／HEIC）。請改用截圖或轉存為 JPG 後再上傳。`,
         'error'
       );
       return;
@@ -1213,11 +1220,13 @@ document.getElementById('ocr-run-btn').addEventListener('click', async () => {
   showOcrStatus(`辨識中，共 ${files.length} 個檔案，請稍候（約10~30秒）...`);
 
   try {
+    // detail:'high' 會讓模型用比較高的解析度讀圖，視覺 token 較多、也比較貴，
+    // 但這份文件的重點就是讀被紅色印章／浮水印蓋住的日期數字，這裡不適合省。
     const contentBlocks = [];
     for (const file of files) {
       if (isPdfFile(file)) {
         const b64 = await fileToBase64(file);
-        contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: b64 } });
+        contentBlocks.push({ type: 'input_file', filename: file.name || 'document.pdf', file_data: `data:application/pdf;base64,${b64}`, detail: 'high' });
         continue;
       }
       if (isHeicFile(file)) {
@@ -1235,34 +1244,51 @@ document.getElementById('ocr-run-btn').addEventListener('click', async () => {
           );
         }
         const b64 = await fileToBase64(jpgBlob);
-        contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: b64 } });
+        contentBlocks.push({ type: 'input_image', image_url: `data:image/jpeg;base64,${b64}`, detail: 'high' });
         continue;
       }
       const b64 = await fileToBase64(file);
-      contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: b64 } });
+      contentBlocks.push({ type: 'input_image', image_url: `data:${file.type || 'image/jpeg'};base64,${b64}`, detail: 'high' });
     }
     showOcrStatus(`辨識中，共 ${files.length} 個檔案，請稍候（約10~30秒）...`);
-    contentBlocks.push({ type: 'text', text: OCR_PROMPT });
+    contentBlocks.push({ type: 'input_text', text: OCR_PROMPT });
 
-    // 送到 Apps Script 代理伺服器，不是直接送到 Anthropic。用 text/plain 而不是
+    // 送到 Apps Script 代理伺服器，不是直接送到 OpenAI。用 text/plain 而不是
     // application/json，是為了避免瀏覽器對 Apps Script 網頁應用程式發出 CORS 預檢請求
     // （Apps Script 沒辦法正確回應預檢），Apps Script 那邊一樣會把內容當 JSON 解析。
+    const body = {
+      model: OCR_MODEL,
+      // 推理模型會先花掉一部分額度在內部思考上，所以要留得比實際輸出的表格多一些，
+      // 不然會出現「回傳被截斷、後面幾筆行程不見了」的情況。
+      max_output_tokens: 8192,
+      input: [{ role: 'user', content: contentBlocks }],
+    };
+    // reasoning 參數只有 gpt-5 / o 系列的推理模型吃得下，
+    // 換成 gpt-4.1 之類的非推理模型時送這個欄位會直接被 API 退件。
+    if (/^(gpt-5|o\d)/.test(OCR_MODEL)) body.reasoning = { effort: 'low' };
+
     const resp = await fetch(OCR_PROXY_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        max_tokens: 4096,
-        output_config: { effort: 'low' },
-        messages: [{ role: 'user', content: contentBlocks }],
-      }),
+      body: JSON.stringify(body),
     });
 
     // 代理伺服器（Apps Script）永遠回傳 HTTP 200，錯誤是包在回傳內容的 error 欄位裡，
-    // 不能靠 resp.ok 判斷成功或失敗。
+    // 不能靠 resp.ok 判斷成功或失敗。OpenAI 自己的錯誤也是 { error: { message } } 的形狀。
     const data = await resp.json();
     if (data.error) throw new Error(data.error.message || '代理伺服器發生未知錯誤');
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
+    // OpenAI Responses API 的回傳結構：output 是一個陣列，裡面除了我們要的 message，
+    // 還會混雜 reasoning 之類的項目，所以要先挑出 type === 'message' 再取 output_text。
+    // （data.output_text 是官方 SDK 才有的便利屬性，直接打 HTTP 拿不到，不能依賴它。）
+    const text = (data.output || [])
+      .filter(item => item.type === 'message')
+      .flatMap(item => item.content || [])
+      .filter(c => c.type === 'output_text')
+      .map(c => c.text)
+      .join('\n');
+    if (!text.trim() && data.status === 'incomplete') {
+      throw new Error('AI 回傳的內容被截斷了（' + (data.incomplete_details && data.incomplete_details.reason || 'unknown') + '），請減少一次上傳的頁數後重試。');
+    }
     importOcrResult(text);
   } catch (err) {
     showOcrStatus('辨識失敗：' + err.message, 'error');
